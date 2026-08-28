@@ -64,7 +64,7 @@ async def register(ctx: discord.ApplicationContext, password: str):
         print(f"LOG: User {ctx.author.name} registered with hash: {password_hash}.")
 
         cursor.execute(
-            f"INSERT INTO {TABLE_NAME} (user_id, rank, level, xp, password_hash) VALUES (?, ?, ?, ?, ?)",
+            f"INSERT INTO {TABLE_NAME} (user_id, rank, level, xp, password_hash, remember_login) VALUES (?, ?, ?, ?, ?, FALSE)",
             (user_id, ranks_dict['normal'], 0, 0, password_hash)
         )
 
@@ -139,9 +139,43 @@ async def logout(ctx: discord.ApplicationContext):
         print(f"LOG: User {ctx.author.name} attempted to log out but is not logged in.")
         await ctx.respond("You are not logged in.", ephemeral=True)
 
+@nexus.command(name="remember", description="Remembers to log you in automatically upon bot startup because the user is lazy.")
+async def remember(ctx: discord.ApplicationContext):
+    user_id = ctx.author.id
+
+    if await BasicIsIDNotLoggedInMessage(ctx, user_id):
+        return
+
+    cursor.execute(
+        f"UPDATE {TABLE_NAME} SET remember_login = TRUE WHERE user_id = ?",
+        (user_id,)
+    )
+
+    connection.commit()
+
+    print(f"LOG: user {ctx.author.name} (ID: {user_id}) will now be remembered to log in automatically upon bot startup.")
+    await ctx.respond("You will now be remembered to log in automatically upon bot startup.", ephemeral=True)
+
+@nexus.command(name="forget", description="Forgets to log you in automatically upon bot startup.")
+async def forget(ctx: discord.ApplicationContext):
+    user_id = ctx.author.id
+
+    if await BasicIsIDNotLoggedInMessage(ctx, user_id):
+        return
+
+    cursor.execute(
+        f"UPDATE {TABLE_NAME} SET remember_login = FALSE WHERE user_id = ?",
+        (user_id,)
+    )
+
+    connection.commit()
+
+    print(f"LOG: user {ctx.author.name} (ID: {user_id}) will no longer be remembered to log in automatically upon bot startup.")
+    await ctx.respond("You will no longer be remembered- wait, who are you?", ephemeral=True)
+
 @nexus.command(name="random-number", description="Generates a random number.")
 async def random_number(ctx: discord.ApplicationContext, min_value: int, max_value: int):
-    if await BasicIsNotLoggedInMessage(ctx) or await BasicIsBlacklistedMessage(ctx):
+    if await BasicIsIDNotLoggedInMessage(ctx, ctx.author.id) or await BasicIsBlacklistedMessage(ctx):
         return
 
     if min_value >= max_value:
@@ -157,7 +191,7 @@ async def random_number(ctx: discord.ApplicationContext, min_value: int, max_val
 async def level(ctx: discord.ApplicationContext):
     user_id = ctx.author.id
 
-    if await BasicIsNotLoggedInMessage(ctx) or await BasicIsBlacklistedMessage(ctx):
+    if await BasicIsIDNotLoggedInMessage(ctx, user_id) or await BasicIsBlacklistedMessage(ctx):
         return
 
     # grab the xp and level from the database
@@ -256,7 +290,7 @@ async def unblacklist(ctx: discord.ApplicationContext, target: discord.Member):
 
 @nexus.command(name="check", description="Checks a user's stats.")
 async def check(ctx: discord.ApplicationContext, target: discord.Member):
-    if await BasicIsNotLoggedInMessage(ctx):
+    if await BasicIsIDNotLoggedInMessage(ctx, ctx.author.id) or await BasicIsBlacklistedMessage(ctx):
         return
 
     # Check if the target exists in the database

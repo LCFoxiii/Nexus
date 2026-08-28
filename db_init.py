@@ -13,9 +13,7 @@ from env_setup import *
 # - xp (int)                              #
 # - rank (int)                            #
 # - password_hash (text (255 chars))      #
-# - created_at (timestamp)                #
-# db_version:                             #
-# - version (int)                         #
+# - remember_login (boolean)              #
 # --------------------------------------- #
 # rank system:                            #
 # - 0 = normal user                       #
@@ -32,7 +30,6 @@ connection = sqlite3.connect("nexus.db")
 cursor = connection.cursor()
 
 TABLE_NAME = "users"
-VERSION_TABLE_NAME = "db_version"
 
 # 👀 sneak peek?
 GAME_TABLE_NAME = "slimequest"
@@ -52,35 +49,50 @@ connection.execute(
         xp INTEGER DEFAULT 0,
         rank INTEGER DEFAULT 0,
         password_hash VARCHAR(255) DEFAULT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        remember_login BOOLEAN DEFAULT FALSE
     )
 """
 )
 print(f"SUCCESS: Table {TABLE_NAME} created or already exists.")
 
-print(f"ATTEMPT: Creating table {VERSION_TABLE_NAME} if it does not exist...")
-connection.execute(
-    f"""
-    CREATE TABLE IF NOT EXISTS {VERSION_TABLE_NAME} (
-        version INTEGER DEFAULT 0
-    )
-"""
-)
-print(f"SUCCESS: Table {VERSION_TABLE_NAME} created or already exists.")
-
 
 print("ATTEMPT: Attempting migration check...")
+
+cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
+table_columns = {row[1] for row in cursor.fetchall()}
+
+
+# migration check.
+
+print("ATTEMPT: Migrating database schema to version 1...")
+
+# add remember_login column to users table
+if "remember_login" not in table_columns:
+    cursor.execute(
+        f"ALTER TABLE {TABLE_NAME} ADD COLUMN remember_login BOOLEAN DEFAULT FALSE"
+    )
+
+# Remove created_at column from users table
+if "created_at" in table_columns:
+    cursor.execute(
+        f"ALTER TABLE {TABLE_NAME} DROP COLUMN created_at"
+    )
+connection.commit()
+
+print(f"SUCCESS: Migration check complete.")
+
+# put all users with remember_login = TRUE into the online_users.
+
+print("ATTEMPT: Putting all users with remember_login = TRUE into the online_users set...")
 cursor.execute(
-    "SELECT version FROM db_version"
+    f"SELECT user_id FROM {TABLE_NAME} WHERE remember_login = TRUE"
 )
+ids = cursor.fetchall()
+for id_tuple in ids:
+    online_users.add(id_tuple[0])
+print(f"SUCCESS: {len(online_users)} users used remember_login = TRUE and are now in the online_users set.")
 
-version_result = cursor.fetchone()
-version = version_result[0]
-
-# TODO: add migration logic here whenever I need to update the database schema in the future.
-print(f"SUCCESS: Migration check complete. Current version: {version}")
-
-
+# Helpers
 
 def IsOwner(ctx: discord.ApplicationContext) -> bool:
     return ctx.author.id == OWNER_ID
@@ -146,13 +158,6 @@ async def BasicIsNotVIPMessage(ctx: discord.ApplicationContext) -> bool:
 async def BasicIsBlacklistedMessage(ctx: discord.ApplicationContext) -> bool:
     if IsIDBlacklisted(ctx.author.id):
         await ctx.respond("ERROR: Womp womp, you're not able to use the bot now.", ephemeral=True)
-        return True
-    return False
-
-async def BasicIsNotLoggedInMessage(ctx: discord.ApplicationContext) -> bool:
-    if ctx.author.id not in online_users:
-        await ctx.respond("ERROR: You are NOT logged in!", ephemeral=True)
-        print(f"LOG: User {ctx.author.name} attempted to use a command without being logged in.")
         return True
     return False
 

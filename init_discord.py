@@ -30,6 +30,22 @@ print(f"ATTEMPT: Initializing Discord bot...")
 bot = discord.Bot(intents=INTENTS, command_prefix=PREFIX)
 print(f"SUCCESS: Discord bot initialized.")
 
+# helpers
+
+async def GetUserFromID(user_id: int):
+    user = bot.get_user(user_id) or await bot.fetch_user(user_id)
+    return user
+    
+
+async def BasicIsIDNotLoggedInMessage(ctx: discord.ApplicationContext, user_id: int):
+    if user_id not in online_users:
+        user = await GetUserFromID(user_id)
+
+        await ctx.respond(f"{user.name} is not logged in. Please log in first.", ephemeral=True)
+        print(f"LOG: User {user.name} attempted to login but is not logged in.")
+        return True
+    return False
+
 # slash command groups
 nexus = bot.create_group("nexus", "Nexus commands")
 vip_exclusive = nexus.create_subgroup("vip", "VIP exclusive commands")
