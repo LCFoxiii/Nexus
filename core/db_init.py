@@ -1,8 +1,8 @@
 import sqlite3
+
 import discord
-from discord.ext import *
-import dotenv as env
-from env_setup import *
+
+from .env_setup import OWNER_ID
 
 # --------------------------------------- #
 #            NexusDB contents             #
@@ -22,23 +22,16 @@ from env_setup import *
 # etc.                                    #
 # --------------------------------------- #
 
-# storing user ids is i think the best way to do this
-# since i think i can get the name and discriminator from the user id using this library.
-
 online_users: set[int] = set()
 connection = sqlite3.connect("nexus.db")
 cursor = connection.cursor()
 
 TABLE_NAME = "users"
 
-# 👀 sneak peek?
-GAME_TABLE_NAME = "slimequest"
-
-print(f"ATTEMPT: Initializing ranks...")
+print("ATTEMPT: Initializing ranks...")
 ranks = ["normal", "vip", "blacklisted"]
 ranks_dict = {rank: i for i, rank in enumerate(ranks)}
 print(f"SUCCESS: Ranks initialized. {ranks_dict}")
-
 
 print(f"ATTEMPT: Creating table {TABLE_NAME} if it does not exist...")
 connection.execute(
@@ -55,33 +48,21 @@ connection.execute(
 )
 print(f"SUCCESS: Table {TABLE_NAME} created or already exists.")
 
-
 print("ATTEMPT: Attempting migration check...")
-
 cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
 table_columns = {row[1] for row in cursor.fetchall()}
 
-
-# migration check.
-
 print("ATTEMPT: Migrating database schema to version 1...")
-
-# add remember_login column to users table
 if "remember_login" not in table_columns:
     cursor.execute(
         f"ALTER TABLE {TABLE_NAME} ADD COLUMN remember_login BOOLEAN DEFAULT FALSE"
     )
-
-# Remove created_at column from users table
 if "created_at" in table_columns:
     cursor.execute(
         f"ALTER TABLE {TABLE_NAME} DROP COLUMN created_at"
     )
 connection.commit()
-
-print(f"SUCCESS: Migration check complete.")
-
-# put all users with remember_login = TRUE into the online_users.
+print("SUCCESS: Migration check complete.")
 
 print("ATTEMPT: Putting all users with remember_login = TRUE into the online_users set...")
 cursor.execute(
@@ -92,10 +73,10 @@ for id_tuple in ids:
     online_users.add(id_tuple[0])
 print(f"SUCCESS: {len(online_users)} users used remember_login = TRUE and are now in the online_users set.")
 
-# Helpers
 
 def IsOwner(ctx: discord.ApplicationContext) -> bool:
     return ctx.author.id == OWNER_ID
+
 
 def IsIDVIP(user_id: int) -> bool:
     cursor.execute(
@@ -105,17 +86,19 @@ def IsIDVIP(user_id: int) -> bool:
     result = cursor.fetchone()
     return result is not None
 
+
 def IsAuthorVIP(ctx: discord.ApplicationContext) -> bool:
     user_id = ctx.author.id
     return IsIDVIP(user_id)
+
 
 def GrantIDVIP(user_id: int) -> None:
     cursor.execute(
         f"UPDATE {TABLE_NAME} SET rank = {ranks_dict['vip']} WHERE user_id = ?",
         (user_id,)
     )
-
     connection.commit()
+
 
 def RevokeIDVIP(user_id: int) -> None:
     cursor.execute(
@@ -123,15 +106,16 @@ def RevokeIDVIP(user_id: int) -> None:
         (user_id,)
     )
 
+
 def FetchLevelAndXP(user_id: int) -> tuple[int, int]:
-    # grab the xp and level from the database
     cursor.execute(
         f"SELECT level, xp FROM {TABLE_NAME} WHERE user_id = ?",
         (user_id,)
     )
 
     result = cursor.fetchone()
-    return result[0], result[1]  # level, xp
+    return result[0], result[1]
+
 
 def IsIDBlacklisted(user_id: int) -> bool:
     cursor.execute(
@@ -141,12 +125,14 @@ def IsIDBlacklisted(user_id: int) -> bool:
     result = cursor.fetchone()
     return result is not None
 
+
 async def BasicIsNotOwnerMessage(ctx: discord.ApplicationContext) -> bool:
     if not IsOwner(ctx):
         await ctx.respond("ERROR: You are NOT the owner!", ephemeral=True)
         print(f"LOG: User {ctx.author.name} attempted to use an owner command without being the owner.")
         return True
     return False
+
 
 async def BasicIsNotVIPMessage(ctx: discord.ApplicationContext) -> bool:
     if not IsAuthorVIP(ctx):
@@ -155,11 +141,13 @@ async def BasicIsNotVIPMessage(ctx: discord.ApplicationContext) -> bool:
         return True
     return False
 
+
 async def BasicIsBlacklistedMessage(ctx: discord.ApplicationContext) -> bool:
     if IsIDBlacklisted(ctx.author.id):
         await ctx.respond("ERROR: Womp womp, you're not able to use the bot now.", ephemeral=True)
         return True
     return False
+
 
 def IsIDExists(user_id: int) -> bool:
     cursor.execute(
@@ -168,6 +156,7 @@ def IsIDExists(user_id: int) -> bool:
     )
     result = cursor.fetchone()
     return result is not None
+
 
 async def BasicIsIDExistsMessage(bot: discord.Bot, ctx: discord.ApplicationContext, user_id: int) -> bool:
     if not IsIDExists(user_id):
