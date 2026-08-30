@@ -52,18 +52,6 @@ print("ATTEMPT: Attempting migration check...")
 cursor.execute(f"PRAGMA table_info({TABLE_NAME})")
 table_columns = {row[1] for row in cursor.fetchall()}
 
-print("ATTEMPT: Migrating database schema to version 1...")
-if "remember_login" not in table_columns:
-    cursor.execute(
-        f"ALTER TABLE {TABLE_NAME} ADD COLUMN remember_login BOOLEAN DEFAULT FALSE"
-    )
-if "created_at" in table_columns:
-    cursor.execute(
-        f"ALTER TABLE {TABLE_NAME} DROP COLUMN created_at"
-    )
-connection.commit()
-print("SUCCESS: Migration check complete.")
-
 print("ATTEMPT: Putting all users with remember_login = TRUE into the online_users set...")
 cursor.execute(
     f"SELECT user_id FROM {TABLE_NAME} WHERE remember_login = TRUE"
