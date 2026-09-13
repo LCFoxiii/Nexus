@@ -2,7 +2,8 @@ from core.init_discord import *
 from core.env_setup import *
 from core.db_init import *
 from core.embeds_helper import *
-from nexus_commands import *
+from nexus import *
+from slimequest import *
 
 @bot.event
 async def on_ready():
@@ -56,5 +57,6 @@ bot.run(TOKEN)
 
 print("ATTEMPT: Closing the database connection...")
 connection.close()
+sq_connection.close()
 print("SUCCESS: Database connection closed.")
 print("Thank you for using the bot! Have a great day!")

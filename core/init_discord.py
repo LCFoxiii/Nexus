@@ -47,3 +47,5 @@ async def BasicIsIDNotLoggedInMessage(ctx: discord.ApplicationContext, user_id: 
 nexus = bot.create_group("nexus", "Nexus commands")
 vip_exclusive = nexus.create_subgroup("vip", "VIP exclusive commands")
 owner_exclusive = nexus.create_subgroup("owner", "Owner exclusive commands")
+
+slimequest = bot.create_group("slimequest", "SlimeQuest commands")
