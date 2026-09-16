@@ -25,19 +25,20 @@ async def register(ctx: discord.ApplicationContext):
         # Username
         await ctx.respond("Please enter a name for your character (max 32 characters):")
         user_name = await bot.wait_for('message', check=lambda message: message.author == ctx.author)
+        un_content = user_name.content.strip()
 
-        if len(user_name.content) > 32:
+        if len(un_content) > 32:
             await ctx.respond("ERROR: Name is too long.")
             continue
 
         # if user_name is already taken, ask for a new name
         result = sq_cursor.execute(
             f"SELECT * FROM {TABLE_USERS} WHERE name = ?",
-            (user_name.content,)
+            (un_content,)
         ).fetchone() is not None
 
         if result:
-            await ctx.respond(f"ERROR: Name {user_name.content} is already taken.")
+            await ctx.respond(f"ERROR: Name {un_content} is already taken.")
             continue
 
         # Gender

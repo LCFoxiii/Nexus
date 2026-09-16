@@ -48,7 +48,8 @@ sq_cursor.execute(
             mana INTEGER NOT NULL DEFAULT 100,
             strength INTEGER NOT NULL DEFAULT 10,
             defense INTEGER NOT NULL DEFAULT 10,
-            speed INTEGER NOT NULL DEFAULT 10
+            speed INTEGER NOT NULL DEFAULT 10,
+            damage INTEGER NOT NULL DEFAULT 30
         )
     """
 )
