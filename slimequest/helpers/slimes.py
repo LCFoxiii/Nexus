@@ -6,6 +6,7 @@ def CreateSlimeEntry(
         health:             int,
         defense:            int,
         damage:             int,
+        speed:              int,
         xp:                 int,
         copper_slime_coins: int,
         silver_slime_coins: int,
@@ -20,6 +21,7 @@ def CreateSlimeEntry(
             "health": health,
             "defense": defense,
             "damage": damage,
+            "speed": speed,
             "rewards": {
                 
                 "stats": {
@@ -44,6 +46,7 @@ CreateSlimeEntry(
     health              = 100, # also scalable based on the slime's level
     defense             = 10,
     damage              = 10,
+    speed               = 10,
     xp                  = 10,
     copper_slime_coins  = 10,
     silver_slime_coins  = 5,

@@ -46,8 +46,9 @@ sq_cursor.execute(
             xp INTEGER NOT NULL DEFAULT 0,
             health INTEGER NOT NULL DEFAULT 100,
             mana INTEGER NOT NULL DEFAULT 100,
-            strength INTEGER NOT NULL DEFAULT 10,
-            defense INTEGER NOT NULL DEFAULT 10,
+            dexterity INTEGER NOT NULL DEFAULT 0,
+            strength INTEGER NOT NULL DEFAULT 0,
+            defense INTEGER NOT NULL DEFAULT 0,
             speed INTEGER NOT NULL DEFAULT 10,
             damage INTEGER NOT NULL DEFAULT 30
         )
