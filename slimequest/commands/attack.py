@@ -12,7 +12,15 @@ import random
 import asyncio
 
 MESSAGE_DELETE_DELAY = 1.0 # seconds
-ASYNCIO_SLEEP_DELAY  = 0.5 # seconds    
+ASYNCIO_SLEEP_DELAY  = 0.5 # seconds
+
+# possible slime actions
+ATTACK  = "attack"
+BLOCK   = "block"
+PARRY   = "parry"
+NOTHING = "nothing"
+
+# NOTE: d1f <= chance means success, d1f > chance means failure. (d1f = random.uniform(0, 1))
 
 class SQAttackUI(discord.ui.View):
     
@@ -21,8 +29,7 @@ class SQAttackUI(discord.ui.View):
         self.author = author
         
         self.slime_info   = slime_info
-        self.slime_choice = slime_choice # could either be attack, block, parry, nothing.
-        
+        self.slime_choice = slime_choice
         
         self.escape_chance = escape_chance
         self.battle_state  = battle_state
@@ -42,56 +49,51 @@ class SQAttackUI(discord.ui.View):
 
     @discord.ui.button(label="Attack", row=0, style=discord.ButtonStyle.red)
     async def attack_button(self, button: discord.ui.Button, interaction: discord.Interaction):
-        if (self.battle_state["slime_turn_count"] < 0 or (self.battle_state["slime_turn_count"] >= 0 and self.slime_choice not in ["attack", "block", "parry"])):
+        if self.slime_choice == ATTACK:
+            await interaction.response.send_message("TEMP: both attacked, clashed, no damage dealt, -1 for both.", delete_after=MESSAGE_DELETE_DELAY)
+            self.battle_state["slime_turn_count"] = -1
+            self.battle_state["player_turn_count"] = -1
+        elif self.slime_choice == BLOCK:
+            #TODO: Implement a chance for the player to break through the slime's block and deal damage, based on the player's sword PEN stat.
+            await interaction.response.send_message("TEMP: you attack, the slime blocks. -1 turn.", delete_after=MESSAGE_DELETE_DELAY)
+            self.battle_state["player_turn_count"] = -1
+        elif self.slime_choice == PARRY:
+            await interaction.response.send_message("TEMP: you attack, the slime parries. -2 turns.", delete_after=MESSAGE_DELETE_DELAY)
+            self.battle_state["player_turn_count"] = -2
+        elif (self.slime_choice == NOTHING):
+            
+            #TODO: also add a crit chance stat to the player (0-200)
             critical_chance = SQAdjustToPercentage(self.player_dexterity, 0, 100)
             
-            d100 = random.randint(1, 100)
-            self.slime_info["health"] -= self.adjusted_player_damage * (1 + int(d100 <= critical_chance))
+            d1f = random.uniform(0, 1)
             
-            if d100 <= critical_chance:
+            is_critical = d1f <= critical_chance
+            self.slime_info["health"] -= self.adjusted_player_damage * (1 + is_critical)
+            
+            if d1f <= critical_chance:
                 await interaction.response.send_message(f"CRITICAL HIT! You dealt {self.adjusted_player_damage * 2} damage to the slime!", delete_after=MESSAGE_DELETE_DELAY)
             else:
                 await interaction.response.send_message(f"+{self.adjusted_player_damage} damage to the slime!", delete_after=MESSAGE_DELETE_DELAY)
-            
-            self.stop()
-            return
-        
-        if (self.battle_state["slime_turn_count"] >= 0):
-            if self.slime_choice == "attack":
-                await interaction.response.send_message("TEMP: both attacked, clashed, no damage dealt, -1 for both.", delete_after=MESSAGE_DELETE_DELAY)
-                self.battle_state["slime_turn_count"] = -1
-                self.battle_state["player_turn_count"] = -1
-            elif self.slime_choice == "block":
-                #TODO: Implement a chance for the player to break through the slime's block and deal damage, based on the player's sword PEN stat.
-                await interaction.response.send_message("TEMP: you attack, the slime blocks. -1 turn.", delete_after=MESSAGE_DELETE_DELAY)
-                self.battle_state["player_turn_count"] = -1
-            elif self.slime_choice == "parry":
-                await interaction.response.send_message("TEMP: you attack, the slime parries. -2 turns.", delete_after=MESSAGE_DELETE_DELAY)
-                self.battle_state["player_turn_count"] = -2
 
         self.stop()
     
     @discord.ui.button(label="Defend", row=0, style=discord.ButtonStyle.green)
     async def defend_button(self, button: discord.ui.Button, interaction: discord.Interaction):
         #TODO: Add defense success & failure chance mechanic based on player's DEX stat. and also the shield's base block percentage stat.
-        #TODO: Add slime's attack penetration mechanic based on slime's PEN stat. (1.0 = 100% penetration, 0.0 = 0% penetration chance)
+        #TODO: Add slime's attack penetration mechanic based on slime's PEN stat. (0-100)
         #for now, 100% success rate of blocking the slime's attack. and no penetration damage.
         
-        if (self.battle_state["slime_turn_count"] >= 0):
-            if (self.slime_choice == "attack"):
-                await interaction.response.send_message("TEMP: you defend, slime attacked, no damage dealt. -1 turn for slime.", delete_after=MESSAGE_DELETE_DELAY)
-                self.battle_state["slime_turn_count"] = -1
-            elif (self.slime_choice == "block"):
-                await interaction.response.send_message("TEMP: both defended, no damage dealt, -1 for both.", delete_after=MESSAGE_DELETE_DELAY)
-                self.battle_state["slime_turn_count"] = -1
-                self.battle_state["player_turn_count"] = -1
-            elif (self.slime_choice == "parry"):
-                await interaction.response.send_message("TEMP: you defend, slime parries, no damage dealt. -1 for both.", delete_after=MESSAGE_DELETE_DELAY)
-                self.battle_state["slime_turn_count"] = -1
-                self.battle_state["player_turn_count"] = -1
-            else:
-                await interaction.response.send_message("TEMP: You defend, slime did nothing. -1 turn.", delete_after=MESSAGE_DELETE_DELAY)
-                self.battle_state["player_turn_count"] = -1
+        if (self.slime_choice == ATTACK):
+            await interaction.response.send_message("TEMP: you defend, slime attacked, no damage dealt. -1 turn for slime.", delete_after=MESSAGE_DELETE_DELAY)
+            self.battle_state["slime_turn_count"] = -1
+        elif (self.slime_choice == BLOCK):
+            await interaction.response.send_message("TEMP: both defended, no damage dealt, -1 for both.", delete_after=MESSAGE_DELETE_DELAY)
+            self.battle_state["slime_turn_count"] = -1
+            self.battle_state["player_turn_count"] = -1
+        elif (self.slime_choice == PARRY):
+            await interaction.response.send_message("TEMP: you defend, slime parries, no damage dealt. -1 for both.", delete_after=MESSAGE_DELETE_DELAY)
+            self.battle_state["slime_turn_count"] = -1
+            self.battle_state["player_turn_count"] = -1
         else:
             await interaction.response.send_message("TEMP: You defend, slime did nothing. -1 turn.", delete_after=MESSAGE_DELETE_DELAY)
             self.battle_state["player_turn_count"] = -1
@@ -100,47 +102,39 @@ class SQAttackUI(discord.ui.View):
         
     @discord.ui.button(label="Parry", row=0, style=discord.ButtonStyle.blurple)
     async def parry_button(self, button: discord.ui.Button, interaction: discord.Interaction):
-        d100 = random.randint(1, 100)
+        d1f = random.uniform(0, 1)
         parry_chance = SQAdjustToPercentage(self.player_dexterity, 0, 100)
         
-        if (d100 >= parry_chance):
-            await interaction.response.send_message(f"TEMP: you failed, you took {self.adjusted_slime_damage} damage. -1 turn.", delete_after=MESSAGE_DELETE_DELAY)
+        if (d1f >= parry_chance):
+            await interaction.response.send_message(f"TEMP: you failed, -1 turn.", delete_after=MESSAGE_DELETE_DELAY)
             self.battle_state["player_turn_count"] = -1
-            self.player_health -= self.adjusted_slime_damage
             
             self.stop()
             return
             
-        
-        if (self.battle_state["slime_turn_count"] >= 0):
-            if (self.slime_choice == "attack"):
-                await interaction.response.send_message("TEMP: you parry, slime attacked, no damage dealt. -2 turns for slime.", delete_after=MESSAGE_DELETE_DELAY)
-                self.battle_state["slime_turn_count"] = -2
-            elif (self.slime_choice == "block"):
-                await interaction.response.send_message("TEMP: you parry, slime blocked, no damage dealt. -1 turn.", delete_after=MESSAGE_DELETE_DELAY)
-                self.battle_state["player_turn_count"] = -1
-            elif (self.slime_choice == "parry"):
-                await interaction.response.send_message("TEMP: both parried, no damage dealt. -1 for both.", delete_after=MESSAGE_DELETE_DELAY)
-                self.battle_state["slime_turn_count"] = -1
-                self.battle_state["player_turn_count"] = -1
-            else:
-                await interaction.response.send_message("TEMP: You parry, slime did nothing. -1 turn.", delete_after=MESSAGE_DELETE_DELAY)
-                self.battle_state["player_turn_count"] = -1
+        if (self.slime_choice == ATTACK):
+            await interaction.response.send_message("TEMP: you parry, slime attacked, no damage dealt. -2 turns for slime.", delete_after=MESSAGE_DELETE_DELAY)
+            self.battle_state["slime_turn_count"] = -2
+        elif (self.slime_choice == BLOCK):
+            await interaction.response.send_message("TEMP: you parry, slime blocked, no damage dealt. -1 turn.", delete_after=MESSAGE_DELETE_DELAY)
+            self.battle_state["player_turn_count"] = -1
+        elif (self.slime_choice == PARRY):
+            await interaction.response.send_message("TEMP: both parried, no damage dealt. -1 for both.", delete_after=MESSAGE_DELETE_DELAY)
+            self.battle_state["slime_turn_count"] = -1
+            self.battle_state["player_turn_count"] = -1
         else:
             await interaction.response.send_message("TEMP: You parry, slime did nothing. -1 turn.", delete_after=MESSAGE_DELETE_DELAY)
             self.battle_state["player_turn_count"] = -1
             
         self.stop()
         
-    
-        
     @discord.ui.button(label="Run", row=0, style=discord.ButtonStyle.blurple)
     async def run_button(self, button: discord.ui.Button, interaction: discord.Interaction):
-        d100 = random.randint(1, 100)
-        idx = int(d100 <= self.escape_chance)
+        d1f = random.uniform(0, 1)
+        escaped = d1f <= self.escape_chance
         
-        await interaction.response.send_message(f"You've {self.escape_messages[idx]} from the slime! ({self.escape_chance}/{d100})", ephemeral=True, delete_after=MESSAGE_DELETE_DELAY)
-        self.battle_state["is_running"] = bool(idx)
+        await interaction.response.send_message(f"You've {self.escape_messages[escaped]} from the slime! ({self.escape_chance}/{d1f})", ephemeral=True, delete_after=MESSAGE_DELETE_DELAY)
+        self.battle_state["is_running"] = escaped
         self.battle_state["player_turn_count"] = -1 if not self.battle_state["is_running"] else 0
         self.stop()
 
@@ -176,7 +170,7 @@ async def attack(ctx: discord.ApplicationContext):
     user_id = author.id
     
     # grab some stuff from the database.
-    player_base_damage, player_defense, player_health, player_speed, player_dexterity = DBGrab(user_id, TABLE_STATS, ["damage", "defense", "health", "speed", "dexterity"], ID_NAME, sq_cursor)[0]
+    player_base_damage, player_defense, player_health, player_speed, player_dexterity = DBGrab(user_id, TABLE_STATS, ["damage", "defense", "health", "speed", "dexterity"], ID_NAME, sq_cursor)
     
     # adjustions
     adjusted_slime_damage   = SQGetDamage(player_defense, slime_damage)
@@ -211,32 +205,24 @@ async def attack(ctx: discord.ApplicationContext):
             await ctx.send(f"You ran away from the {slime_name}!")
             break
         
-        # just in case.
-        battle_states['player_turn_count'] = 0 + (battle_states["player_turn_count"] * (battle_states["player_turn_count"] < 10))
-        battle_states['slime_turn_count']  = 0 + (battle_states["slime_turn_count"]  * (battle_states["slime_turn_count"]  < 10))
-        
-        if battle_states['player_turn_count'] < 0:
-            
-            # I think the slime should automatically attack the player if the player has no turns left.
-            # In my eyes, this is probably fair.
+        # This should make the slime attack the player until the player have turns again.
+        if battle_states['player_turn_count'] < 0 and battle_states['slime_turn_count'] >= 0:
             player_health -= adjusted_slime_damage
             battle_states['player_turn_count'] += 1
             
             await ctx.send(f"The {slime_name} attacked you for {adjusted_slime_damage} damage! Your health is now {player_health}.", delete_after=MESSAGE_DELETE_DELAY)
-            
             continue
         
         # TODO: Implement something that makes the slime's choice more intelligent, based on the slime's INT stat.
         
         # this has a chance of beating your ass, so i hope you are lucky.
-        slime_choice = random.choice(["attack", "block", "parry", "nothing"]) if battle_states['slime_turn_count'] >= 0 else "nothing"
-        battle_states['slime_turn_count'] += int(battle_states['slime_turn_count'] < 0)
+        slime_choice = random.choice([ATTACK, BLOCK, PARRY, NOTHING]) if battle_states['slime_turn_count'] >= 0 else NOTHING
+        battle_states['slime_turn_count'] += battle_states['slime_turn_count'] < 0
         
-        battle_view = SQAttackUI(slime_info, author, adjusted_player_damage, slime_choice, battle_states, escape_chance, player_dexterity)
+        battle_view = SQAttackUI(slime_info, author, adjusted_player_damage, slime_choice, battle_states, escape_chance, player_dexterity, player_health)
         
         await fight_msg.edit(embed=embed, view=battle_view)
         await battle_view.wait()
     
     # update the player's health in the database after the battle.
     DBUpdate(user_id, TABLE_STATS, {"health": player_health}, ID_NAME, sq_cursor, sq_connection)
-    

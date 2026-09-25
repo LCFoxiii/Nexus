@@ -1,13 +1,7 @@
 import discord
 
-from core.init_discord import (
-    BasicIsNotOwnerMessage,
-    GrantIDVIP,
-    RevokeIDVIP,
-    owner_exclusive,
-    ranks_dict,
-)
-from core.db_init import TABLE_NAME, connection, cursor
+from core.init_discord import *
+from core.db_init import *
 
 
 @owner_exclusive.command(name="grant", description="Grant a user VIP.")

@@ -6,9 +6,6 @@ def DBGrab(id, table, columns, id_name, cursor):
     
     result = cursor.fetchone()
     
-    if result is None:
-        return None
-    
     return result
 
 def DBUpdate(id, table, updates, id_name, cursor, connection):

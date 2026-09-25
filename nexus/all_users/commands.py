@@ -35,7 +35,7 @@ async def register(ctx: discord.ApplicationContext, password: str):
             (user_id, ranks_dict['normal'], 0, 0, password_hash)
         )
 
-        connection.commit()
+        
         await ctx.respond("You have been registered!", ephemeral=True)
     else:
         print(f"LOG: User {ctx.author.name} attempted to register but is already registered.")
@@ -82,7 +82,7 @@ async def login(ctx: discord.ApplicationContext, password: str):
                 (new_hash, user_id)
             )
 
-            connection.commit()
+            
 
             print(f"LOG: User {ctx.author.name}'s password hash has been rehashed for security.")
     else:
@@ -116,7 +116,7 @@ async def remember(ctx: discord.ApplicationContext):
         (user_id,)
     )
 
-    connection.commit()
+    
 
     print(f"LOG: user {ctx.author.name} (ID: {user_id}) will now be remembered to log in automatically upon bot startup.")
     await ctx.respond("You will now be remembered to log in automatically upon bot startup.", ephemeral=True)
@@ -134,7 +134,7 @@ async def forget(ctx: discord.ApplicationContext):
         (user_id,)
     )
 
-    connection.commit()
+    
 
     print(f"LOG: user {ctx.author.name} (ID: {user_id}) will no longer be remembered to log in automatically upon bot startup.")
     await ctx.respond("You will no longer be remembered- wait, who are you?", ephemeral=True)
