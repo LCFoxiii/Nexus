@@ -16,12 +16,6 @@ import asyncio
 MESSAGE_DELETE_DELAY = 1.0
 ASYNCIO_SLEEP_DELAY  = 0.5
 
-# possible slime actions
-ATTACK  = "attack"
-BLOCK   = "block"
-PARRY   = "parry"
-NOTHING = "nothing"
-
 class SQAttackUI(discord.ui.View):
 
     def __init__(self, slime_info, author, adjustions, slime_choice, battle_state, chances):
@@ -244,6 +238,9 @@ async def attack(ctx: discord.ApplicationContext):
     slime_damage      = slime_info["damage"]
     slime_defense     = slime_info["defense"]
     slime_speed       = slime_info["speed"]
+    
+    # fancy slime stuff
+    slime_moveset     = slime_info["moveset"] # think of this as the slime's "personality".
 
     embed = discord.Embed(
         title=slime_name,
@@ -325,7 +322,7 @@ async def attack(ctx: discord.ApplicationContext):
         slime_choice = NOTHING
 
         if battle_states["slime_turn_count"] >= 0:
-            slime_choice = random.choice([ATTACK, BLOCK, PARRY, NOTHING])
+            slime_choice = random.choice(slime_moveset)
         else:
             battle_states["slime_turn_count"] += 1
 

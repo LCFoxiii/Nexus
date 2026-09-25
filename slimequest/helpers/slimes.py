@@ -1,3 +1,25 @@
+# possible slime actions
+ATTACK  = "attack"
+BLOCK   = "block"
+PARRY   = "parry"
+NOTHING = "nothing"
+
+
+movesets = {
+    "all_attacks": [ATTACK],
+    "all_blocks": [BLOCK],
+    "all_parries": [PARRY],
+    "all_nothings": [NOTHING],
+    
+    "normal": [ATTACK, BLOCK, PARRY, NOTHING],
+    "aggressive": [ATTACK, ATTACK, BLOCK, PARRY],
+    "defensive": [BLOCK, BLOCK, ATTACK, PARRY],
+    "cowardly": [BLOCK, BLOCK, BLOCK, NOTHING],
+    "duelist": [ATTACK, PARRY]
+}
+
+
+
 slime_entries = {}
 def CreateSlimeEntry(
         name:               str,
@@ -11,6 +33,7 @@ def CreateSlimeEntry(
         copper_slime_coins: int,
         silver_slime_coins: int,
         gold_slime_coins:   int,
+        moveset:            list[str],
         slime_image:        str, # this is just paths
     ) -> None:
     slime_entries.update({
@@ -34,6 +57,9 @@ def CreateSlimeEntry(
                     "gold_slime_coins": gold_slime_coins
                 },
             },
+            
+            "moveset": moveset,
+            
             "slime_image": slime_image
         }
     })
@@ -51,6 +77,7 @@ CreateSlimeEntry(
     copper_slime_coins  = 10,
     silver_slime_coins  = 5,
     gold_slime_coins    = 1,
+    moveset             = movesets["normal"],
     slime_image         = "temporary, do not use this, this is just a placeholder for now."
 )
 
