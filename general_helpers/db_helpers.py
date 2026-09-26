@@ -17,3 +17,10 @@ def DBUpdate(id, table, updates, id_name, cursor, connection):
         values
     )
     connection.commit()
+
+def DBIncrement(id, table, column, increment_value, id_name, cursor, connection):
+    cursor.execute(
+        f"UPDATE {table} SET {column} = {column} + ? WHERE {id_name} = ?",
+        (increment_value, id)
+    )
+    connection.commit()

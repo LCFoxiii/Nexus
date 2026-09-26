@@ -4,6 +4,8 @@ from ..helpers.user_exists import *
 from ..helpers.slime_damage import *
 from ..helpers.slimes import *
 from ..helpers.adjust_to_percentage import *
+from ..helpers.items import *
+from ..helpers.put_in_inventory import *
 
 from general_helpers.db_helpers import *
 
@@ -241,6 +243,8 @@ async def attack(ctx: discord.ApplicationContext):
     
     # fancy slime stuff
     slime_moveset     = slime_info["moveset"] # think of this as the slime's "personality".
+    guaranteed_loot   = slime_info["guaranteed_loot"]
+    randomized_loot   = slime_info["possible_loot"]
 
     embed = discord.Embed(
         title=slime_name,
@@ -289,9 +293,31 @@ async def attack(ctx: discord.ApplicationContext):
 
         if slime_info["health"] <= 0:
             await ctx.send(f"You defeated the {slime_name}!")
-
-            # TODO: get the rewards.
-
+            
+            # TODO: add a message that shows the rewards the player got from defeating the slime.
+            
+            currency_rewards = slime_info["rewards"]["currency"]
+            stats_rewards = slime_info["rewards"]["stats"]
+            
+            if currency_rewards:
+                for key, coins in currency_rewards.items():
+                    DBIncrement(user_id, TABLE_CURRENCY, key, coins, ID_NAME, sq_cursor, sq_connection)
+            
+            if stats_rewards:
+                for key, value in stats_rewards.items():
+                    DBIncrement(user_id, TABLE_STATS, key, value, ID_NAME, sq_cursor, sq_connection)
+            
+            # inventory rewards
+            for item_id, quantity in guaranteed_loot.items():
+                SQPutItemInInventory(user_id, item_id, quantity)
+            
+            for item_id, (max_quantity, chance) in randomized_loot.items():
+                d1f = random.uniform(0, 1)
+                
+                if chance > d1f:
+                    quantity = random.randint(1, max_quantity)
+                    SQPutItemInInventory(user_id, item_id, quantity)
+            
             break
 
         if player_health <= 0:

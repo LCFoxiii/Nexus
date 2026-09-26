@@ -1,3 +1,5 @@
+from .items import *
+
 # possible slime actions
 ATTACK  = "attack"
 BLOCK   = "block"
@@ -18,8 +20,6 @@ movesets = {
     "duelist": [ATTACK, PARRY]
 }
 
-
-
 slime_entries = {}
 def CreateSlimeEntry(
         name:               str,
@@ -34,6 +34,8 @@ def CreateSlimeEntry(
         silver_slime_coins: int,
         gold_slime_coins:   int,
         moveset:            list[str],
+        guaranteed_loot:    dict[int, int], # id, quantity
+        possible_loot:      dict[int, int, float], # id, quantity, chance (randomized, both in id and quantity.)
         slime_image:        str, # this is just paths
     ) -> None:
     slime_entries.update({
@@ -60,6 +62,8 @@ def CreateSlimeEntry(
             
             "moveset": moveset,
             
+            "guaranteed_loot": guaranteed_loot,
+            "possible_loot": possible_loot,
             "slime_image": slime_image
         }
     })
@@ -77,7 +81,9 @@ CreateSlimeEntry(
     copper_slime_coins  = 10,
     silver_slime_coins  = 5,
     gold_slime_coins    = 1,
-    moveset             = movesets["normal"],
+    guaranteed_loot     = {DEV_ITEM: 1},
+    possible_loot       = {DEV_ITEM: (4, 0.5)}, # 50% chance to drop this, and if that succeeds, it will randomly drop between 1 and 4 of this item.
+    moveset             = movesets["all_nothings"],
     slime_image         = "temporary, do not use this, this is just a placeholder for now."
 )
 

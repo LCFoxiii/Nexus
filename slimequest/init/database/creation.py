@@ -5,13 +5,21 @@ sq_connection = sqlite3.connect("slimequest.db")
 sq_cursor = sq_connection.cursor()
 
 # just to make it easier to find tables and stuff.
-TABLE_USERS    = "sq_users"
-TABLE_CURRENCY = "sq_currency"
-TABLE_STATS    = "sq_stats"
+TABLE_USERS     = "sq_users"
+TABLE_CURRENCY  = "sq_currency"
+TABLE_STATS     = "sq_stats"
+TABLE_INVENTORY = "sq_inventory"
+TABLE_ITEMS     = "sq_items"
+TABLE_INSTANCE  = "sq_instance"
 
 # no inventory for the time being.
 
 ID_NAME = "id"
+ID_NAME_INSTANCE = "instance_id"
+ID_NAME_ITEM = "item_id"
+
+# enable foreign keys
+sq_cursor.execute("PRAGMA foreign_keys = ON")
 
 # users
 sq_cursor.execute(
@@ -55,6 +63,32 @@ sq_cursor.execute(
     """
 )
 
+
+# instance
+sq_cursor.execute(
+    f"""
+        CREATE TABLE IF NOT EXISTS {TABLE_INSTANCE} (
+            {ID_NAME_INSTANCE} INTEGER PRIMARY KEY
+        )
+    """
+)
+
+# inventory
+# this allows slot 0 and below, but i need this for equipment and other specialized slots.
+sq_cursor.execute(
+    f"""
+        CREATE TABLE IF NOT EXISTS {TABLE_INVENTORY} (
+            {ID_NAME} INTEGER PRIMARY KEY,
+            {ID_NAME_ITEM} INTEGER NOT NULL,
+            {ID_NAME_INSTANCE} INTEGER DEFAULT NULL,
+            slot INTEGER NOT NULL CHECK (slot <= 32),
+            quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
+            FOREIGN KEY ({ID_NAME_INSTANCE}) REFERENCES {TABLE_INSTANCE}({ID_NAME_INSTANCE}),
+            UNIQUE ({ID_NAME}, slot, {ID_NAME_INSTANCE})
+        )
+    """
+)
+
 # possible entries?
 
 # table name: sq_users
@@ -81,7 +115,16 @@ sq_cursor.execute(
 
 # table name: sq_inventory
 # id (int primary key) (could use discord id)
-# TODO: figure this shit out
+# item_id (int)
+# instance_id (int)
+# quantity (int)
+# slot
+# instance_id (reference to sq_instance table, nullable.)
+
+# table name: sq_instance
+# id (int primary key) (could use discord id)
+# instance_id (int)
+# etc.
 
 # items and other shit plans:
 
