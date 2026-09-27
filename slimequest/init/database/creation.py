@@ -12,8 +12,7 @@ TABLE_INVENTORY = "sq_inventory"
 TABLE_ITEMS     = "sq_items"
 TABLE_INSTANCE  = "sq_instance"
 
-# no inventory for the time being.
-
+# ids
 ID_NAME = "id"
 ID_NAME_INSTANCE = "instance_id"
 ID_NAME_ITEM = "item_id"
@@ -54,11 +53,12 @@ sq_cursor.execute(
             xp INTEGER NOT NULL DEFAULT 0,
             health INTEGER NOT NULL DEFAULT 100,
             mana INTEGER NOT NULL DEFAULT 100,
-            dexterity INTEGER NOT NULL DEFAULT 0,
-            strength INTEGER NOT NULL DEFAULT 0,
-            defense INTEGER NOT NULL DEFAULT 0,
-            speed INTEGER NOT NULL DEFAULT 10,
-            damage INTEGER NOT NULL DEFAULT 30
+            dexterity INTEGER NOT NULL DEFAULT 0 CHECK (dexterity >= 0 AND dexterity <= 100),
+            strength INTEGER NOT NULL DEFAULT 0 CHECK (strength >= 0),
+            defense INTEGER NOT NULL DEFAULT 0 CHECK (defense >= 0),
+            speed INTEGER NOT NULL DEFAULT 10 CHECK (speed >= 0 AND speed <= 100),
+            damage INTEGER NOT NULL DEFAULT 30 CHECK (damage >= 0),
+            critical_chance INTEGER NOT NULL DEFAULT 0 CHECK (critical_chance >= 0 AND critical_chance <= 200),
         )
     """
 )
@@ -68,7 +68,7 @@ sq_cursor.execute(
 sq_cursor.execute(
     f"""
         CREATE TABLE IF NOT EXISTS {TABLE_INSTANCE} (
-            {ID_NAME_INSTANCE} INTEGER PRIMARY KEY
+            {ID_NAME_INSTANCE} INTEGER PRIMARY KEY AUTOINCREMENT
         )
     """
 )
@@ -78,13 +78,16 @@ sq_cursor.execute(
 sq_cursor.execute(
     f"""
         CREATE TABLE IF NOT EXISTS {TABLE_INVENTORY} (
-            {ID_NAME} INTEGER PRIMARY KEY,
+            {ID_NAME} INTEGER NOT NULL,
             {ID_NAME_ITEM} INTEGER NOT NULL,
             {ID_NAME_INSTANCE} INTEGER DEFAULT NULL,
             slot INTEGER NOT NULL CHECK (slot <= 32),
-            quantity INTEGER NOT NULL DEFAULT 1 CHECK (quantity > 0),
-            FOREIGN KEY ({ID_NAME_INSTANCE}) REFERENCES {TABLE_INSTANCE}({ID_NAME_INSTANCE}),
-            UNIQUE ({ID_NAME}, slot, {ID_NAME_INSTANCE})
+            quantity INTEGER NOT NULL DEFAULT 1,
+
+            FOREIGN KEY ({ID_NAME_INSTANCE})
+                REFERENCES {TABLE_INSTANCE}({ID_NAME_INSTANCE}),
+
+            UNIQUE ({ID_NAME}, slot)
         )
     """
 )

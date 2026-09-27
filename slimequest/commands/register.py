@@ -3,6 +3,8 @@ from ..helpers.user_exists import *
 from ..init.lore.names import *
 from ..init.users.user import *
 
+from ..helpers.put_in_inventory import *
+
 # TODO: Fix the response.
 # TODO: TODO: TODO: idk.
 
@@ -89,4 +91,47 @@ async def register(ctx: discord.ApplicationContext):
     sq_online_users.add(user_id)
 
     await ctx.respond(f"Successfully registered user {user_name.content} with true name {true_name} and gender {int_gender}.")
-    sq_connection.commit()
+    
+    # giving starter items (these will automatically commit to the database, so no need to commit here.)
+    
+    SQPutItemInCustomSlot(
+        user_id=user_id,
+        item_id=WOODEN_SWORD,
+        slot=WEAPON,
+        quantity=1
+    )
+    
+    SQPutItemInCustomSlot(
+        user_id=user_id,
+        item_id=WOODEN_SHIELD,
+        slot=SHIELD,
+        quantity=1
+    )
+    
+    SQPutItemInCustomSlot(
+        user_id=user_id,
+        item_id=LEATHER_HELMET,
+        slot=HELMET,
+        quantity=1
+    )
+    
+    SQPutItemInCustomSlot(
+        user_id=user_id,
+        item_id=LEATHER_CHESTPLATE,
+        slot=CHESTPLATE,
+        quantity=1
+    )
+    
+    SQPutItemInCustomSlot(
+        user_id=user_id,
+        item_id=LEATHER_LEGGINGS,
+        slot=LEGGINGS,
+        quantity=1
+    )
+    
+    SQPutItemInCustomSlot(
+        user_id=user_id,
+        item_id=LEATHER_BOOTS,
+        slot=BOOTS,
+        quantity=1
+    )

@@ -132,3 +132,76 @@ def SQPutItemInInventory(
 
     # Anything remaining couldn't be added.
     return quantity
+
+def SQPutItemInCustomSlot(
+    user_id: int,
+    item_id: int,
+    slot: int,
+    quantity: int = 1,
+) -> int:
+    """
+    Adds an item to the player's inventory in a specific slot.
+
+    If the slot is already occupied, the function will not add the item.
+
+    Returns:
+        int: The amount of items that could NOT be added.
+    """
+    
+    if slot == WEAPON and items_dict[item_id]["item_type"] != WEAPON_ITEM:
+        raise ValueError(f"Item {item_id} is not a weapon and cannot be placed in the weapon slot.")
+    
+    elif slot == SHIELD and items_dict[item_id]["item_type"] != SHIELD_ITEM:
+        raise ValueError(f"Item {item_id} is not a shield and cannot be placed in the shield slot.")
+    
+    elif slot in [HELMET, CHESTPLATE, LEGGINGS, BOOTS] and items_dict[item_id]["item_type"] != ARMOR_ITEM:
+        raise ValueError(f"Item {item_id} is not armor and cannot be placed in the armor slot.")
+    
+
+    if quantity <= 0:
+        return 0
+
+    item = items_dict.get(item_id)
+
+    if item is None:
+        raise ValueError(f"Item {item_id} does not exist.")
+
+    max_stack = item["max_stack"]
+
+    # Check if the slot is already occupied
+    sq_cursor.execute(
+        f"""
+            SELECT quantity
+            FROM {TABLE_INVENTORY}
+            WHERE {ID_NAME} = ?
+              AND slot = ?
+        """,
+        (user_id, slot)
+    )
+
+    existing_stack = sq_cursor.fetchone()
+
+    if existing_stack is not None:
+        # Slot is occupied, cannot add items
+        return quantity
+
+    amount_to_add = min(quantity, max_stack)
+
+    sq_cursor.execute(
+        f"""
+            INSERT INTO {TABLE_INVENTORY}
+            (
+                {ID_NAME},
+                {ID_NAME_ITEM},
+                quantity,
+                slot
+            )
+            VALUES (?, ?, ?, ?)
+        """,
+        (user_id, item_id, amount_to_add, slot)
+    )
+
+    sq_connection.commit()
+
+    # Return any remaining items that couldn't be added
+    return quantity - amount_to_add

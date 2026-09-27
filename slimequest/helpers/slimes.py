@@ -36,6 +36,7 @@ def CreateSlimeEntry(
         moveset:            list[str],
         guaranteed_loot:    dict[int, int], # id, quantity
         possible_loot:      dict[int, int, float], # id, quantity, chance (randomized, both in id and quantity.)
+        penetration:        int, # this is a percentage, so 0 - 100.
         slime_image:        str, # this is just paths
     ) -> None:
     slime_entries.update({
@@ -61,9 +62,9 @@ def CreateSlimeEntry(
             },
             
             "moveset": moveset,
-            
             "guaranteed_loot": guaranteed_loot,
             "possible_loot": possible_loot,
+            "penetration": penetration, # this is a percentage, so 0 - 100.
             "slime_image": slime_image
         }
     })
@@ -84,7 +85,8 @@ CreateSlimeEntry(
     guaranteed_loot     = {DEV_ITEM: 1},
     possible_loot       = {DEV_ITEM: (4, 0.5)}, # 50% chance to drop this, and if that succeeds, it will randomly drop between 1 and 4 of this item.
     moveset             = movesets["all_nothings"],
-    slime_image         = "temporary, do not use this, this is just a placeholder for now."
+    penetration         = 10, # this is a percentage, so 0 - 100.
+    slime_image         = "temporary, do not use this, this is just a placeholder for now.",
 )
 
 print(slime_entries)
