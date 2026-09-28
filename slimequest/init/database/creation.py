@@ -58,7 +58,7 @@ sq_cursor.execute(
             defense INTEGER NOT NULL DEFAULT 0 CHECK (defense >= 0),
             speed INTEGER NOT NULL DEFAULT 10 CHECK (speed >= 0 AND speed <= 100),
             damage INTEGER NOT NULL DEFAULT 30 CHECK (damage >= 0),
-            critical_chance INTEGER NOT NULL DEFAULT 0 CHECK (critical_chance >= 0 AND critical_chance <= 200),
+            critical_chance INTEGER NOT NULL DEFAULT 0 CHECK (critical_chance >= 0 AND critical_chance <= 200)
         )
     """
 )

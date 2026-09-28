@@ -61,7 +61,7 @@ async def Attack(adjustions, chances, player_health, interaction, slime_info):
 
 class SQAttackUI(discord.ui.View):
 
-    def __init__(self, slime_info, author, adjustions, slime_choice, battle_state, chances, player_health):
+    def __init__(self, slime_info, author, adjustions, slime_choice, battle_state, chances, player_health, slime_moveset):
         super().__init__()
         self.author       = author
 
@@ -70,6 +70,7 @@ class SQAttackUI(discord.ui.View):
 
         self.battle_state = battle_state
         self.chances      = chances
+        self.slime_moveset = slime_moveset
 
         self.adjustions   = adjustions
         
@@ -81,9 +82,38 @@ class SQAttackUI(discord.ui.View):
             return False
 
         return True
+    
+    def choose_slime_move(self, player_move):
+        
+        if self.battle_state["slime_turn_count"] < 0:
+            self.battle_state["slime_turn_count"] += 1
+            return NOTHING
+
+        d1f = random.uniform(0, 1)
+        if self.chances["slime_intelligence"] > d1f:
+
+            # move ordered in:
+            # most to the least likely to hit player.
+            if player_move == ATTACK:
+                priorities = [PARRY, BLOCK, ATTACK, NOTHING]
+
+            elif player_move == BLOCK:
+                priorities = [NOTHING, BLOCK, PARRY, ATTACK]
+
+            elif player_move == PARRY:
+                priorities = [NOTHING, BLOCK, PARRY, ATTACK]
+
+            for move in priorities:
+                if move in self.slime_moveset:
+                    return move
+
+        # Unintelligent slime just picks randomly.
+        return random.choice(self.slime_moveset)
 
     @discord.ui.button(label="Attack", row=0, style=discord.ButtonStyle.red)
     async def attack_button(self, button: discord.ui.Button, interaction: discord.Interaction):
+        
+        self.slime_choice = self.choose_slime_move(ATTACK)
 
         if self.slime_choice == ATTACK:
             await interaction.response.send_message(
@@ -130,6 +160,9 @@ class SQAttackUI(discord.ui.View):
 
     @discord.ui.button(label="Defend", row=0, style=discord.ButtonStyle.green)
     async def defend_button(self, button: discord.ui.Button, interaction: discord.Interaction):
+        
+        self.slime_choice = self.choose_slime_move(BLOCK)
+        
         if self.slime_choice == ATTACK:
             
             d1f = random.uniform(0, 1)
@@ -183,6 +216,8 @@ class SQAttackUI(discord.ui.View):
     async def parry_button(self, button: discord.ui.Button, interaction: discord.Interaction):
         d1f = random.uniform(0, 1)
         parry_chance = self.chances["parry"]
+        
+        self.slime_choice = self.choose_slime_move(PARRY)
 
         if parry_chance > d1f:
             await interaction.response.send_message(
@@ -287,9 +322,10 @@ async def attack(ctx: discord.ApplicationContext):
     slime_penetration = slime_info["penetration"]
 
     # fancy slime stuff
-    slime_moveset     = slime_info["moveset"] # think of this as the slime's "personality".
-    guaranteed_loot   = slime_info["guaranteed_loot"]
-    randomized_loot   = slime_info["possible_loot"]
+    slime_moveset      = slime_info["moveset"] # think of this as the slime's "personality".
+    guaranteed_loot    = slime_info["guaranteed_loot"]
+    randomized_loot    = slime_info["possible_loot"]
+    slime_intelligence = slime_info["intelligence"]
     
     # fancy inventory stuff
     
@@ -382,7 +418,8 @@ async def attack(ctx: discord.ApplicationContext):
         "parry":               SQAdjustToPercentage(player_dexterity, 0, 100),
         "splash_reduction":    SQAdjustToPercentage(combined_splash_protection, 0, 500),
         "block_penetration":   SQAdjustToPercentage(weapon_block_penetration, 0, 100),
-        "slime_penetration":   SQAdjustToPercentage(slime_penetration, player_dexterity + shield_defense_boost, 200)
+        "slime_penetration":   SQAdjustToPercentage(slime_penetration, player_dexterity + shield_defense_boost, 200),
+        "slime_intelligence":  SQAdjustToPercentage(slime_intelligence, 0, 100)
     }
     
     # embeds
@@ -459,17 +496,8 @@ async def attack(ctx: discord.ApplicationContext):
 
             continue
 
-        # TODO: Implement something that makes the slime's choice more intelligent, based on the slime's INT stat.
-
-        # This has a chance of beating your ass, so i hope you are lucky.
         slime_choice = NOTHING
-
-        if battle_states["slime_turn_count"] >= 0:
-            slime_choice = random.choice(slime_moveset)
-        else:
-            battle_states["slime_turn_count"] += 1
-
-        battle_view = SQAttackUI(slime_info, author, adjustions, slime_choice, battle_states, chances, player_health)
+        battle_view = SQAttackUI(slime_info, author, adjustions, slime_choice, battle_states, chances, player_health, slime_moveset)
 
         await fight_msg.edit(embed=embed, view=battle_view)
         await battle_view.wait()
