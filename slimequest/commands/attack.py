@@ -447,8 +447,7 @@ async def attack(ctx: discord.ApplicationContext):
 
         if slime_info["health"] <= 0:
             await ctx.send(f"You defeated the {slime_name}!")
-            
-            # TODO: add a message that shows the rewards the player got from defeating the slime.
+            rewards_message: str = ""
             
             currency_rewards = slime_info["rewards"]["currency"]
             stats_rewards = slime_info["rewards"]["stats"]
@@ -456,14 +455,17 @@ async def attack(ctx: discord.ApplicationContext):
             if currency_rewards:
                 for key, coins in currency_rewards.items():
                     DBIncrement(user_id, TABLE_CURRENCY, key, coins, ID_NAME, sq_cursor, sq_connection)
+                    rewards_message += f"+{coins} {str(key).replace('_', ' ').title()}!\n"
             
             if stats_rewards:
                 for key, value in stats_rewards.items():
                     DBIncrement(user_id, TABLE_STATS, key, value, ID_NAME, sq_cursor, sq_connection)
+                    rewards_message += f"+{value} {str(key).replace('_', ' ').title()}!\n"
             
             # inventory rewards
             for item_id, quantity in guaranteed_loot.items():
                 SQPutItemInInventory(user_id, item_id, quantity)
+                rewards_message += f"+{quantity} {items_dict[item_id]['name']}!\n"
             
             for item_id, (max_quantity, chance) in randomized_loot.items():
                 d1f = random.uniform(0, 1)
@@ -471,7 +473,9 @@ async def attack(ctx: discord.ApplicationContext):
                 if chance > d1f:
                     quantity = random.randint(1, max_quantity)
                     SQPutItemInInventory(user_id, item_id, quantity)
+                    rewards_message += f"+{quantity} {items_dict[item_id]['name']}!\n"
             
+            await ctx.send(rewards_message)
             break
 
         if player_health <= 0:

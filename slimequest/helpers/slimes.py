@@ -86,9 +86,9 @@ CreateSlimeEntry(
     gold_slime_coins    = 1,
     guaranteed_loot     = {DEV_ITEM: 1},
     possible_loot       = {DEV_ITEM: (4, 0.5)}, # 50% chance to drop this, and if that succeeds, it will randomly drop between 1 and 4 of this item.
-    moveset             = movesets["normal"],
+    moveset             = movesets["all_nothings"],
     penetration         = 10, # this is a percentage, so 0 - 100.
-    intelligence        = 10,
+    intelligence        = 0,
     slime_image         = "temporary, do not use this, this is just a placeholder for now.",
 )
 
