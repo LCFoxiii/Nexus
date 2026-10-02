@@ -6,6 +6,7 @@ from ..helpers.slimes import *
 from ..helpers.adjust_to_percentage import *
 from ..helpers.items import *
 from ..helpers.put_in_inventory import *
+from ..helpers.delays import *
 
 from general_helpers.db_helpers import *
 
@@ -14,9 +15,19 @@ from ..init.database.creation import *
 import random
 import asyncio
 
-# delays (in seconds)
-MESSAGE_DELETE_DELAY = 1.0
-ASYNCIO_SLEEP_DELAY  = 0.5
+# ---------------------------------------------------------- #
+# a little bit of a sneak peek, but                          #
+# in the future, everything will be combined into one.       #
+# so, using commands for now is just a temporary thing.      #
+#                                                            #
+# later, there's going to be a "/slimequest play"            #
+# command that will combine all of the commands into one.    #
+# thus, the discord MMORPG can be played in one command.     #
+#                                                            #
+# but then again, that is going to be so far in the future   #
+# that it might not even be worth mentioning.                #
+# but, a thought is a thought.                               #
+# ---------------------------------------------------------- #
 
 # helper function
 async def Attack(adjustions, chances, player_health, interaction, slime_info):
@@ -508,36 +519,3 @@ async def attack(ctx: discord.ApplicationContext):
 
     # Update the player's health in the database after the battle.
     DBUpdate(user_id, TABLE_STATS, {"health": player_health}, ID_NAME, sq_cursor, sq_connection)
-    
-# temporary test command to see if items are being added to the inventory correctly.
-# delete this command later, it's just for testing purposes.
-@slimequest.command(name="test_inventory", description="TEMP: Test command to see if items are being added to the inventory correctly.")
-async def test_inventory(ctx: discord.ApplicationContext):
-    await ctx.defer()
-    
-    if await SQUserExistsMessage(ctx):
-        return
-
-    user_id = ctx.author.id
-
-    # view everything in the inventory for this user.
-    sq_cursor.execute(
-        f"""
-            SELECT {ID_NAME_ITEM}, quantity, slot
-            FROM {TABLE_INVENTORY}
-            WHERE {ID_NAME} = ?
-        """,
-        (user_id,)
-    )
-    
-    inventory_items = sq_cursor.fetchall()
-    idx = 1
-    
-    if not inventory_items:
-        await ctx.respond("Your inventory is empty.")
-        return
-    
-    for item_id, quantity, slot in inventory_items:
-        item_name = items_dict[item_id]["name"]
-        await ctx.respond(f"{idx}: {item_name} (ID: {item_id}) - Quantity: {quantity} - Slot: {slot}")
-        idx += 1

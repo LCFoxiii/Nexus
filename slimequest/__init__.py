@@ -8,6 +8,8 @@ from .helpers.user_exists          import *
 from .helpers.slime_damage         import *
 from .helpers.slimes               import *
 from .helpers.adjust_to_percentage import *
+from .helpers.delays               import *
 
 from .commands.register      import *
 from .commands.attack        import *
+from .commands.inventory     import *

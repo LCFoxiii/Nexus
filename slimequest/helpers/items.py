@@ -16,12 +16,12 @@ SHIELD_ITEM = "shield_item"
 ARMOR_ITEM = "armor_item"
 
 # special slots
-WEAPON = -1
-SHIELD = -2
-HELMET = -3
-CHESTPLATE = -4
-LEGGINGS = -5
-BOOTS = -6
+HELMET     = -6
+CHESTPLATE = -5
+LEGGINGS   = -4
+BOOTS      = -3
+WEAPON     = -2
+SHIELD     = -1
 
 items_dict = {}
 

@@ -1,0 +1,3 @@
+# delays (in seconds)
+MESSAGE_DELETE_DELAY = 1.0
+ASYNCIO_SLEEP_DELAY  = 0.5
