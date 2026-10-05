@@ -30,6 +30,26 @@ def SQInventorySlotHasNoItems(slot_entry):
     return slot_entry is None or slot_entry.get("item_id") is None
 
 
+def SQMoveItemToEmptySlot(user_id, slot_from, slot_to):
+    sq_cursor.execute(
+        f"""
+            UPDATE {TABLE_INVENTORY}
+            SET slot = ?
+            WHERE {ID_NAME} = ?
+              AND slot = ?
+        """,
+        (slot_to, user_id, slot_from)
+    )
+    sq_connection.commit()
+
+
+def SQGetInventoryItems(user_id):
+    return sq_cursor.execute(
+        f"SELECT item_id, quantity, slot FROM {TABLE_INVENTORY} WHERE {ID_NAME} = ? ORDER BY slot ASC",
+        (user_id,)
+    ).fetchall()
+
+
 def build_inventory_sections(inventory_items, cursor_position):
     inventory_by_slot = {
         slot: {
@@ -79,6 +99,30 @@ def build_inventory_sections(inventory_items, cursor_position):
 
     return sections, slot_entries
 
+class SQInventorySwapItemsConfirmation(discord.ui.View):
+    def __init__(self, author):
+        super().__init__()
+        self.author = author
+        self.result = None
+        
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user != self.author:
+            await interaction.response.send_message("This is not your inventory!", ephemeral=True)
+            return False
+        return True
+    
+    @discord.ui.button(label="Confirm", style=discord.ButtonStyle.success)
+    async def confirm_swap(self, button: discord.ui.Button, interaction: discord.Interaction):
+        self.result = True
+        await interaction.response.defer()
+        self.stop()
+        
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.danger)
+    async def cancel(self, button: discord.ui.Button, interaction: discord.Interaction):
+        self.result = False
+        await interaction.response.defer()
+        self.stop()
+
 class SQInventoryInspectEntries(discord.ui.View):
     def __init__(self, author, exit_loop):
         super().__init__()
@@ -116,13 +160,14 @@ class SQInventoryInspectEntries(discord.ui.View):
         self.stop()
 
 class SQInventoryMainUI(discord.ui.View):
-    def __init__(self, author, exit_main_loop, main_msg, slot_entries, cursor_position):
+    def __init__(self, author, exit_main_loop, main_msg, slot_entries, cursor_position, move_entries):
         super().__init__()
         self.author = author
         self.exit_main_loop = exit_main_loop
         self.main_msg = main_msg
         self.slot_entries = slot_entries
         self.cursor_position = cursor_position
+        self.move_entries = move_entries
         
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user != self.author:
@@ -145,22 +190,76 @@ class SQInventoryMainUI(discord.ui.View):
             self.cursor_position = (self.cursor_position + 1) % len(self.slot_entries)
         await interaction.response.defer()
         self.stop()
-        
-    #TODO: Add a "Move" button to move items between slots.
-    # if there is an item in that slot, it will give an option to swap or cancel.
-    # and if there is no item in that slot, it will move the item to that slot.
     
     @discord.ui.button(label="Move", style=discord.ButtonStyle.secondary)
     async def move_button(self, button: discord.ui.Button, interaction: discord.Interaction):
-        # Plans:
-        # 1. create a list with a size of two. (from, to)
-        # 1,1. Slot 0 could be a slot where the item is temporarily stored for swapping.
-        # 2. create a counter for the number of moves made for the counter list (0 -> 1)
-        # 3. everytime this button is pressed, it will store the item id on the list, indexed by the counter.
-        # 3,1. if there's nothing there, reset the whole move process and exit the move mode.
-        # 4. If the counter is 1, first it will move the "from" spot to slot 0, then move the "to" spot to "from", and slot 0 to "to".
-        # 4,1. If the "to" spot is empty, it will just move the item to that spot.
         
+        # 1. Get the selected slot and item id.
+        selected_slot = self.slot_entries[self.cursor_position]
+        
+        # 2. counter stuff
+        if (self.move_entries["move_counter"] == 0):
+            if SQInventorySlotHasNoItems(selected_slot):
+                await interaction.response.send_message("Select a slot with an item first.", delete_after=MESSAGE_DELETE_DELAY)
+                self.stop()
+                return
+
+            # first move, store the "from" slot and item id.
+            self.move_entries["move_list"][0] = selected_slot
+            self.move_entries["move_counter"] = 1
+            await interaction.response.send_message("Please select the destination slot to move the item to.", delete_after=MESSAGE_DELETE_DELAY)
+        elif (self.move_entries["move_counter"] == 1):
+            # second move, store the "to" slot and item id.
+            self.move_entries["move_list"][1] = selected_slot
+            self.move_entries["move_counter"] = 0
+            
+            from_slot = self.move_entries["move_list"][0]
+            to_slot = self.move_entries["move_list"][1]
+            
+            if (from_slot["slot"] == to_slot["slot"]):
+                await interaction.response.send_message("Cannot move to the same slot.", delete_after=MESSAGE_DELETE_DELAY)
+                self.stop()
+                return
+            
+            # 3. Move directly into empty slots; confirm swaps for occupied slots.
+            if SQInventorySlotHasNoItems(from_slot) and SQInventorySlotHasNoItems(to_slot):
+                await interaction.response.send_message("Both slots are empty. Cannot move.", delete_after=MESSAGE_DELETE_DELAY)
+
+            elif SQInventorySlotHasNoItems(from_slot) or SQInventorySlotHasNoItems(to_slot):
+                source_slot = from_slot if not SQInventorySlotHasNoItems(from_slot) else to_slot
+                target_slot = to_slot if source_slot is from_slot else from_slot
+
+                SQMoveItemToEmptySlot(self.author.id, source_slot["slot"], target_slot["slot"])
+                await interaction.response.send_message("Item moved successfully.", delete_after=MESSAGE_DELETE_DELAY)
+
+            else:
+                confirm_view = SQInventorySwapItemsConfirmation(self.author)
+                await interaction.response.send_message(
+                    (
+                        f"Swap {from_slot['display_name']} with {to_slot['display_name']}?"
+                    ),
+                    view=confirm_view,
+                    ephemeral=True,
+                )
+                await confirm_view.wait()
+
+                if confirm_view.result:
+                    result_swap, reason = SQSwap(
+                        self.author.id,
+                        from_slot["item_id"],
+                        to_slot["item_id"],
+                        from_slot["slot"],
+                        to_slot["slot"],
+                    )
+
+                    await interaction.followup.send(
+                        reason if not result_swap else "Items swapped successfully.",
+                        delete_after=MESSAGE_DELETE_DELAY,
+                        ephemeral=True,
+                    )
+                else:
+                    await interaction.followup.send("Item swap canceled.", delete_after=MESSAGE_DELETE_DELAY, ephemeral=True)
+                
         self.stop()
     
     @discord.ui.button(label="Inspect", style=discord.ButtonStyle.secondary)
@@ -201,6 +300,14 @@ class SQInventoryMainUI(discord.ui.View):
         
         self.stop()
         
+    # TODO: A button that allows you to type in a category and slot number.
+    # this could probably replace the up and down buttons.
+    # layout: "category:slot_number"
+    # example:
+    # "armor:1" would select the first armor slot (helmet)
+    # "weapons:2" would select the second weapon slot (shield)
+    # "items:5" would select the fifth item slot (slot 5)
+        
     @discord.ui.button(label="Exit", style=discord.ButtonStyle.danger)
     async def exit_button(self, button: discord.ui.Button, interaction: discord.Interaction):
         await interaction.response.send_message("Exiting inventory.", delete_after=MESSAGE_DELETE_DELAY)
@@ -220,10 +327,7 @@ async def inventory(ctx: discord.ApplicationContext):
     cursor_position = 0
     
     # 1. get the inventory items from the database
-    inventory_items = sq_cursor.execute(
-        f"SELECT item_id, quantity, slot FROM {TABLE_INVENTORY} WHERE {ID_NAME} = ? ORDER BY slot ASC",
-        (user_id,)
-    ).fetchall()
+    inventory_items = SQGetInventoryItems(user_id)
 
     # 2. categorize inventory entries into weapons, armor, and regular items
     sections, slot_entries = build_inventory_sections(inventory_items, cursor_position)
@@ -236,6 +340,14 @@ async def inventory(ctx: discord.ApplicationContext):
     embed.add_field(name="Weapons", value="\n".join(sections["Weapons"]) if sections["Weapons"] else "None", inline=False)
     embed.add_field(name="Items", value="\n".join(sections["Items"]) if sections["Items"] else "Your inventory is empty.", inline=False)
     
+    # initialize move entries
+    move_list = [None, None]  # [from_slot, to_slot]
+    move_counter = 0
+    move_entries = {
+        "move_list": move_list,
+        "move_counter": move_counter
+    }
+    
     # main loop for the inventory UI
     while True:
         
@@ -243,13 +355,15 @@ async def inventory(ctx: discord.ApplicationContext):
             break
         
         await asyncio.sleep(ASYNCIO_SLEEP_DELAY)
-        
-        # create view with current cursor position
-        inventory_view = SQInventoryMainUI(ctx.author, exit_main_loop, main_msg, slot_entries, cursor_position)
+
+        inventory_items = SQGetInventoryItems(user_id)
 
         sections, slot_entries = build_inventory_sections(inventory_items, cursor_position)
         if slot_entries:
             cursor_position %= len(slot_entries)
+        
+        # create view with current cursor position
+        inventory_view = SQInventoryMainUI(ctx.author, exit_main_loop, main_msg, slot_entries, cursor_position, move_entries)
 
         embed = discord.Embed(title=f"{ctx.author.name}'s Inventory", color=discord.Color.blue())
         embed.add_field(name="Armor", value="\n".join(sections["Armor"]) if sections["Armor"] else "None", inline=False)

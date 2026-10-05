@@ -215,13 +215,16 @@ def SQSwap(
     id_to: int,
     slot_from: int,
     slot_to: int,
-):
+) -> tuple[bool, str]:
     # detect the slot and item type of the items being swapped
     item_from = items_dict.get(id_from)
     item_to = items_dict.get(id_to)
     
     if not item_from and not item_to:
-        raise ValueError("Both slots are empty. Cannot swap empty slots.")
+        return False, "Both slots are empty. Cannot swap empty slots."
+    
+    if slot_from == slot_to:
+        return False, "Cannot swap items in the same slot."
     
     # check if the items can be swapped based on their types and slots
     type_from = item_from["item_type"]
@@ -234,7 +237,7 @@ def SQSwap(
         (slot_to == WEAPON and type_from != WEAPON_ITEM) or \
         (slot_to == SHIELD and type_from != SHIELD_ITEM) or \
         (slot_to in [HELMET, CHESTPLATE, LEGGINGS, BOOTS] and type_from != ARMOR_ITEM):
-        raise ValueError("Items cannot be swapped due to incompatible types and slots.")
+        return False, "Items cannot be swapped due to incompatible types and slots."
         
     # Perform the swap in the database
     sq_cursor.execute(
@@ -260,3 +263,5 @@ def SQSwap(
     
     # commit
     sq_connection.commit()
+    
+    return True, "Items swapped successfully."
