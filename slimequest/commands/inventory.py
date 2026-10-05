@@ -4,7 +4,7 @@ from ..helpers.user_exists import *
 from ..helpers.items import *
 from ..helpers.put_in_inventory import *
 
-
+import re
 import asyncio
 
 # welcome to an over the top inventory system.
@@ -48,6 +48,36 @@ def SQGetInventoryItems(user_id):
         f"SELECT item_id, quantity, slot FROM {TABLE_INVENTORY} WHERE {ID_NAME} = ? ORDER BY slot ASC",
         (user_id,)
     ).fetchall()
+
+
+def SQResolveInventoryCursorIndex(category, cat_slot):
+    category = category.strip().lower()
+
+    if category in ["armor", "armors", ARMOR_ITEM]:
+        armor_slots = [HELMET, CHESTPLATE, LEGGINGS, BOOTS]
+        if 1 <= cat_slot <= len(armor_slots):
+            return next(
+                index
+                for index, (_, slot, _) in enumerate(INVENTORY_SLOT_LAYOUT)
+                if slot == armor_slots[cat_slot - 1]
+            )
+    elif category in ["weapons", "weapon", WEAPON_ITEM, SHIELD_ITEM]:
+        weapon_slots = [WEAPON, SHIELD]
+        if 1 <= cat_slot <= len(weapon_slots):
+            return next(
+                index
+                for index, (_, slot, _) in enumerate(INVENTORY_SLOT_LAYOUT)
+                if slot == weapon_slots[cat_slot - 1]
+            )
+    elif category in ["items", "item", REGULAR_ITEM]:
+        if INVENTORY_SLOT_START <= cat_slot <= INVENTORY_SLOT_END:
+            return next(
+                index
+                for index, (_, slot, _) in enumerate(INVENTORY_SLOT_LAYOUT)
+                if slot == cat_slot
+            )
+
+    return None
 
 
 def build_inventory_sections(inventory_items, cursor_position):
@@ -98,6 +128,14 @@ def build_inventory_sections(inventory_items, cursor_position):
         sections[section_name].append(line)
 
     return sections, slot_entries
+
+
+def SQBuildInventoryEmbed(author_name, sections):
+    embed = discord.Embed(title=f"{author_name}'s Inventory", color=discord.Color.blue())
+    embed.add_field(name="Armor", value="\n".join(sections["Armor"]) if sections["Armor"] else "None", inline=False)
+    embed.add_field(name="Weapons", value="\n".join(sections["Weapons"]) if sections["Weapons"] else "None", inline=False)
+    embed.add_field(name="Items", value="\n".join(sections["Items"]) if sections["Items"] else "Your inventory is empty.", inline=False)
+    return embed
 
 class SQInventorySwapItemsConfirmation(discord.ui.View):
     def __init__(self, author):
@@ -175,21 +213,81 @@ class SQInventoryMainUI(discord.ui.View):
             return False
         return True
     
-    @discord.ui.button(label="Up", style=discord.ButtonStyle.primary)
-    async def up_button(self, button: discord.ui.Button, interaction: discord.Interaction):
-        # move cursor up (wrap around)
-        if self.slot_entries:
-            self.cursor_position = (self.cursor_position - 1) % len(self.slot_entries)
-        await interaction.response.defer()
-        self.stop()
+    # --------------------------------------------------------------------------------- #
+    # hopefully this could save me a lot of web requests.                               #
+    # although, the only tradeoff is that it's a bit more complicated for the players.  #
+    #                                                                                   #
+    # i don't really know if there's a better way to do this,                           #
+    # but this is the best i could come up with for now.                                #
+    # --------------------------------------------------------------------------------- #
     
-    @discord.ui.button(label="Down", style=discord.ButtonStyle.primary)
-    async def down_button(self, button: discord.ui.Button, interaction: discord.Interaction):
-        # move cursor down (wrap around)
-        if self.slot_entries:
-            self.cursor_position = (self.cursor_position + 1) % len(self.slot_entries)
-        await interaction.response.defer()
-        self.stop()
+    # speed comparison of old and new navigation methods:
+    # old up and down buttons: O(n) user interractions to navigate through the inventory.
+    # new goto button:         O(1) user interactions to navigate through the inventory.
+    @discord.ui.button(label="Goto", style=discord.ButtonStyle.success)
+    async def goto_button(self, button: discord.ui.Button, interaction: discord.Interaction):
+        goto_msg = await interaction.response.send_message(
+            "Please enter the category and slot number ('category:slot_number'):",
+            ephemeral=True,
+        )
+
+        try:
+            encoded = await bot.wait_for(
+                "message",
+                check=lambda message: message.author == self.author and message.channel == interaction.channel,
+                timeout=60,
+            )
+        except asyncio.TimeoutError:
+            await interaction.followup.send(
+                "Goto timed out.",
+                ephemeral=True,
+                delete_after=MESSAGE_DELETE_DELAY,
+            )
+            self.stop()
+            return
+
+        await goto_msg.delete_original_response(delay=MESSAGE_DELETE_DELAY)
+        match = re.fullmatch(r"([a-z]+):([1-9]\d*)", encoded.content.strip().lower())
+
+        if not match:
+            await interaction.followup.send(
+                "Invalid format. Use 'category:slot_number'.",
+                ephemeral=True,
+                delete_after=MESSAGE_DELETE_DELAY,
+            )
+            self.stop()
+            return
+
+        category = match.group(1)
+        cat_slot = int(match.group(2))
+        cursor_index = SQResolveInventoryCursorIndex(category, cat_slot)
+
+        if cursor_index is None:
+            await interaction.followup.send(
+                "That category or slot does not exist.",
+                ephemeral=True,
+                delete_after=MESSAGE_DELETE_DELAY,
+            )
+            self.stop()
+            return
+
+        self.cursor_position = cursor_index
+        sections = {
+            "Armor": [],
+            "Weapons": [],
+            "Items": [],
+        }
+        for index, slot_entry in enumerate(self.slot_entries):
+            line = f"{slot_entry['display_name']}: Empty" if SQInventorySlotHasNoItems(slot_entry) else f"{slot_entry['display_name']}: {items_dict.get(slot_entry['item_id'], {}).get('name', f'Item {slot_entry['item_id']}')} x{slot_entry['quantity']}"
+            if index == self.cursor_position:
+                line = f"{SELECTED_ITEM} {line}"
+            sections[slot_entry["section"]].append(line)
+        await self.main_msg.edit(embed=SQBuildInventoryEmbed(self.author.name, sections), view=self)
+        await interaction.followup.send(
+            f"Moved cursor to {category}:{cat_slot}.",
+            ephemeral=True,
+            delete_after=MESSAGE_DELETE_DELAY,
+        )
     
     @discord.ui.button(label="Move", style=discord.ButtonStyle.secondary)
     async def move_button(self, button: discord.ui.Button, interaction: discord.Interaction):
@@ -234,7 +332,7 @@ class SQInventoryMainUI(discord.ui.View):
 
             else:
                 confirm_view = SQInventorySwapItemsConfirmation(self.author)
-                await interaction.response.send_message(
+                confirmation_msg = await interaction.response.send_message(
                     (
                         f"Swap {from_slot['display_name']} with {to_slot['display_name']}?"
                     ),
@@ -242,6 +340,8 @@ class SQInventoryMainUI(discord.ui.View):
                     ephemeral=True,
                 )
                 await confirm_view.wait()
+                
+                await confirmation_msg.delete_original_response(delay=MESSAGE_DELETE_DELAY)
 
                 if confirm_view.result:
                     result_swap, reason = SQSwap(
@@ -299,14 +399,6 @@ class SQInventoryMainUI(discord.ui.View):
             exit_loop = inspect_view.exit_loop
         
         self.stop()
-        
-    # TODO: A button that allows you to type in a category and slot number.
-    # this could probably replace the up and down buttons.
-    # layout: "category:slot_number"
-    # example:
-    # "armor:1" would select the first armor slot (helmet)
-    # "weapons:2" would select the second weapon slot (shield)
-    # "items:5" would select the fifth item slot (slot 5)
         
     @discord.ui.button(label="Exit", style=discord.ButtonStyle.danger)
     async def exit_button(self, button: discord.ui.Button, interaction: discord.Interaction):
