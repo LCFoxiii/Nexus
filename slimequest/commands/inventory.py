@@ -1,146 +1,10 @@
-from core.init_discord import *
 from ..helpers.delays import *
 from ..helpers.user_exists import *
-from ..helpers.items import *
 from ..helpers.put_in_inventory import *
+from ..helpers.inventory_helpers import *
 
 import re
 import asyncio
-
-# welcome to an over the top inventory system.
-# I know this is overkill lmao.
-
-SELECTED_ITEM = "->" # cursor's design.
-INVENTORY_SLOT_START = 1
-INVENTORY_SLOT_END = 32
-INVENTORY_SLOT_LAYOUT = [
-    ("Armor", HELMET, "Helmet"),
-    ("Armor", CHESTPLATE, "Chestplate"),
-    ("Armor", LEGGINGS, "Leggings"),
-    ("Armor", BOOTS, "Boots"),
-    ("Weapons", WEAPON, "Weapon"),
-    ("Weapons", SHIELD, "Shield"),
-] + [
-    ("Items", slot, f"Slot {slot}")
-    for slot in range(INVENTORY_SLOT_START, INVENTORY_SLOT_END + 1)
-]
-
-
-def SQInventorySlotHasNoItems(slot_entry):
-    return slot_entry is None or slot_entry.get("item_id") is None
-
-
-def SQMoveItemToEmptySlot(user_id, slot_from, slot_to):
-    sq_cursor.execute(
-        f"""
-            UPDATE {TABLE_INVENTORY}
-            SET slot = ?
-            WHERE {ID_NAME} = ?
-              AND slot = ?
-        """,
-        (slot_to, user_id, slot_from)
-    )
-    sq_connection.commit()
-
-
-def SQGetInventoryItems(user_id):
-    return sq_cursor.execute(
-        f"SELECT item_id, quantity, slot FROM {TABLE_INVENTORY} WHERE {ID_NAME} = ? ORDER BY slot ASC",
-        (user_id,)
-    ).fetchall()
-
-
-def SQResolveInventoryCursorIndex(category, cat_slot):
-    category = category.strip().lower()
-
-    if category in ["armor", "armors", ARMOR_ITEM]:
-        armor_slots = [HELMET, CHESTPLATE, LEGGINGS, BOOTS]
-        if 1 <= cat_slot <= len(armor_slots):
-            return next(
-                index
-                for index, (_, slot, _) in enumerate(INVENTORY_SLOT_LAYOUT)
-                if slot == armor_slots[cat_slot - 1]
-            )
-    elif category in ["weapons", "weapon", WEAPON_ITEM, SHIELD_ITEM]:
-        weapon_slots = [WEAPON, SHIELD]
-        if 1 <= cat_slot <= len(weapon_slots):
-            return next(
-                index
-                for index, (_, slot, _) in enumerate(INVENTORY_SLOT_LAYOUT)
-                if slot == weapon_slots[cat_slot - 1]
-            )
-    elif category in ["items", "item", REGULAR_ITEM]:
-        if INVENTORY_SLOT_START <= cat_slot <= INVENTORY_SLOT_END:
-            return next(
-                index
-                for index, (_, slot, _) in enumerate(INVENTORY_SLOT_LAYOUT)
-                if slot == cat_slot
-            )
-
-    return None
-
-
-def build_inventory_sections(inventory_items, cursor_position):
-    inventory_by_slot = {
-        slot: {
-            "item_id": item_id,
-            "quantity": quantity,
-        }
-        for item_id, quantity, slot in inventory_items
-    }
-
-    sections = {
-        "Armor": [],
-        "Weapons": [],
-        "Items": [],
-    }
-
-    slot_entries = []
-
-    for index, (section_name, slot, display_name) in enumerate(INVENTORY_SLOT_LAYOUT):
-        inventory_entry = inventory_by_slot.get(slot)
-
-        if SQInventorySlotHasNoItems(inventory_entry):
-            line = f"{display_name}: Empty"
-            slot_entries.append({
-                "slot": slot,
-                "item_id": None,
-                "quantity": None,
-                "section": section_name,
-                "display_name": display_name,
-            })
-        else:
-            item_id = inventory_entry["item_id"]
-            quantity = inventory_entry["quantity"]
-            item_name = items_dict.get(item_id, {}).get("name", f"Item {item_id}")
-            line = f"{display_name}: {item_name} x{quantity}"
-            slot_entries.append({
-                "slot": slot,
-                "item_id": item_id,
-                "quantity": quantity,
-                "section": section_name,
-                "display_name": display_name,
-            })
-
-        if index == cursor_position:
-            line = f"{SELECTED_ITEM} {line}"
-
-        sections[section_name].append(line)
-
-    return sections, slot_entries
-
-
-def SQBuildInventoryEmbed(author_name, sections):
-    embed = discord.Embed(title=f"{author_name}'s Inventory", color=discord.Color.blue())
-    embed.add_field(name="Armor", value="\n".join(sections["Armor"]) if sections["Armor"] else "None", inline=False)
-    embed.add_field(name="Weapons", value="\n".join(sections["Weapons"]) if sections["Weapons"] else "None", inline=False)
-    embed.add_field(name="Items", value="\n".join(sections["Items"]) if sections["Items"] else "Your inventory is empty.", inline=False)
-    return embed
-
-
-def SQBuildInventoryState(author_name, inventory_items, cursor_position):
-    sections, slot_entries = build_inventory_sections(inventory_items, cursor_position)
-    return SQBuildInventoryEmbed(author_name, sections), sections, slot_entries
 
 class SQInventorySwapItemsConfirmation(discord.ui.View):
     def __init__(self, author):
@@ -224,17 +88,6 @@ class SQInventoryMainUI(discord.ui.View):
         await self.main_msg.edit(embed=embed, view=self)
         return embed, sections, slot_entries
     
-    # --------------------------------------------------------------------------------- #
-    # hopefully this could save me a lot of web requests.                               #
-    # although, the only tradeoff is that it's a bit more complicated for the players.  #
-    #                                                                                   #
-    # i don't really know if there's a better way to do this,                           #
-    # but this is the best i could come up with for now.                                #
-    # --------------------------------------------------------------------------------- #
-    
-    # speed comparison of old and new navigation methods:
-    # old up and down buttons: O(n) user interractions to navigate through the inventory.
-    # new goto button:         O(1) user interactions to navigate through the inventory.
     @discord.ui.button(label="Goto", style=discord.ButtonStyle.success)
     async def goto_button(self, button: discord.ui.Button, interaction: discord.Interaction):
         await interaction.response.send_message(
@@ -255,8 +108,8 @@ class SQInventoryMainUI(discord.ui.View):
             )
             self.stop()
             return
+        
         match = re.fullmatch(r"([a-z]+):([1-9]\d*)", encoded.content.strip().lower())
-
         if not match:
             await interaction.followup.send(
                 "Invalid format. Use 'category:slot_number'.",
@@ -299,6 +152,7 @@ class SQInventoryMainUI(discord.ui.View):
             self.move_entries["move_list"][0] = selected_slot
             self.move_entries["move_counter"] = 1
             await interaction.response.send_message("Please select the destination slot to move the item to.", ephemeral=True)
+
         elif (self.move_entries["move_counter"] == 1):
             # second move, store the "to" slot and item id.
             self.move_entries["move_list"][1] = selected_slot
@@ -381,7 +235,7 @@ class SQInventoryMainUI(discord.ui.View):
         quantity = selected_slot["quantity"]
         
         values    = item["values"]
-        rarity    = item["rarity"]
+        rarity    = SQStatToString(item["rarity"])
         max_stack = item["max_stack"]
         stats     = item["stats"]
         
@@ -390,12 +244,12 @@ class SQInventoryMainUI(discord.ui.View):
         value_strings = []
         for value_type, value_amount in values.items():
             if value_amount is not None:
-                value_strings.append(f"{value_type}: {value_amount}")
+                value_strings.append(f"{SQStatToString(value_type)}: {value_amount}")
             
         stats_strings = []
         for stat_type, stat_amount in stats.items():
             if stat_amount is not None:
-                stats_strings.append(f"{stat_type}: {stat_amount}")
+                stats_strings.append(f"{SQStatToString(stat_type)}: {stat_amount}")
         
         embed.add_field(name="Rarity", value=rarity, inline=True)
         embed.add_field(name="Price", value="\n".join(value_strings), inline=True)
@@ -440,11 +294,9 @@ async def inventory(ctx: discord.ApplicationContext):
         cursor_position %= len(slot_entries)
     
     # initialize move entries
-    move_list = [None, None]  # [from_slot, to_slot]
-    move_counter = 0
     move_entries = {
-        "move_list": move_list,
-        "move_counter": move_counter
+        "move_list": [None, None],  # [from_slot, to_slot]
+        "move_counter": 0
     }
     
     # main loop for the inventory UI

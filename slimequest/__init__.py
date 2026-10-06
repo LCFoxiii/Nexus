@@ -9,6 +9,7 @@ from .helpers.slime_damage         import *
 from .helpers.slimes               import *
 from .helpers.adjust_to_percentage import *
 from .helpers.delays               import *
+from .helpers.inventory_helpers    import *
 
 from .commands.register      import *
 from .commands.attack        import *
