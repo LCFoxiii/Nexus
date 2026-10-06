@@ -353,6 +353,7 @@ class SQInventoryMainUI(discord.ui.View):
     @discord.ui.button(label="Inspect", style=discord.ButtonStyle.secondary)
     async def inspect_button(self, button: discord.ui.Button, interaction: discord.Interaction):
         exit_loop = False
+        
         # determine selected item id from cursor
         if not self.slot_entries:
             await interaction.response.send_message("No item selected.", ephemeral=True)
@@ -374,9 +375,33 @@ class SQInventoryMainUI(discord.ui.View):
         )
         
         # TODO: Add more detailed inspection info
-        # this could include stats, sell value, rarity, etc. 
-        # or something that is not null or none.
+        # only asset image left, i guess i'll ask someone to make a few assets for the items.
         
+        item = items_dict[selected_item_id]
+        quantity = selected_slot["quantity"]
+        
+        values    = item["values"]
+        rarity    = item["rarity"]
+        max_stack = item["max_stack"]
+        stats     = item["stats"]
+        
+        stack_string = f"{quantity}/{max_stack}" if max_stack > 1 else "Not stackable"
+        
+        value_strings = []
+        for value_type, value_amount in values.items():
+            if value_amount is not None:
+                value_strings.append(f"{value_type}: {value_amount}")
+            
+        stats_strings = []
+        for stat_type, stat_amount in stats.items():
+            if stat_amount is not None:
+                stats_strings.append(f"{stat_type}: {stat_amount}")
+        
+        embed.add_field(name="Rarity", value=rarity, inline=True)
+        embed.add_field(name="Price", value="\n".join(value_strings), inline=True)
+        embed.add_field(name="Stack Size", value=stack_string, inline=True)
+        embed.add_field(name="Stats", value="\n".join(stats_strings) if stats_strings else "No useful stats available.", inline=True)
+
         while not exit_loop:
             await asyncio.sleep(ASYNCIO_SLEEP_DELAY)
             

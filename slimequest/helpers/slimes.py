@@ -91,5 +91,3 @@ CreateSlimeEntry(
     intelligence        = 0,
     slime_image         = "temporary, do not use this, this is just a placeholder for now.",
 )
-
-print(slime_entries)
