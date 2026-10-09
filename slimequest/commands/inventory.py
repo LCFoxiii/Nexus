@@ -6,6 +6,30 @@ from ..helpers.inventory_helpers import *
 import re
 import asyncio
 
+class SQThrowItemConfirmation(discord.ui.View):
+    def __init__(self, author, confirmation):
+        super().__init__()
+        self.author = author
+        self.confirmation = confirmation
+        
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user != self.author:
+            await interaction.response.send_message("This is not your inventory!", ephemeral=True)
+            return False
+        return True
+    
+    @discord.ui.button(label="Throw", style=discord.ButtonStyle.danger)
+    async def confirm_swap(self, button: discord.ui.Button, interaction: discord.Interaction):
+        self.confirmation = True
+        await interaction.response.defer()
+        self.stop()
+            
+    @discord.ui.button(label="Keep", style=discord.ButtonStyle.success)
+    async def cancel(self, button: discord.ui.Button, interaction: discord.Interaction):
+        self.confirmation = False
+        await interaction.response.defer()
+        self.stop()
+
 class SQInventorySwapItemsConfirmation(discord.ui.View):
     def __init__(self, author):
         super().__init__()
@@ -31,10 +55,12 @@ class SQInventorySwapItemsConfirmation(discord.ui.View):
         self.stop()
 
 class SQInventoryInspectEntries(discord.ui.View):
-    def __init__(self, author, exit_loop):
+    def __init__(self, author, exit_loop, slot_entries, cursor_position):
         super().__init__()
         self.author = author
         self.exit_loop = exit_loop
+        self.slot_entries = slot_entries
+        self.cursor_position = cursor_position
     
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user != self.author:
@@ -52,7 +78,52 @@ class SQInventoryInspectEntries(discord.ui.View):
     
     @discord.ui.button(label="Throw", style=discord.ButtonStyle.danger)
     async def throw(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await interaction.response.send_message("TODO: Implement THROW functionality.", ephemeral=True)
+        # I guess for now i could just remove the item from the inventory,
+        # but I also want to make it so that other players can pick it up randomly.
+        # But that's for later.
+        
+        await interaction.response.send_message("Please type in how much of the item you want to throw away:", ephemeral=True)
+        
+        try:
+            encoded = await bot.wait_for(
+                "message",
+                check=lambda message: message.author == self.author and message.channel == interaction.channel,
+                timeout=60,
+            )
+        except asyncio.TimeoutError:
+            await interaction.followup.send(
+                "Throw timed out.",
+                ephemeral=True,
+            )
+            self.stop()
+            return
+        
+        match = re.fullmatch(r"([1-9]\d*)", encoded.content.strip())
+        if not match:
+            await interaction.followup.send(
+                "Invalid format. Please enter a positive integer.",
+                ephemeral=True,
+            )
+            self.stop()
+            return
+        
+        amount = int(match.group(1))
+        confirmation = SQThrowItemConfirmation(self.author, None)
+        await interaction.followup.send(f"Are you sure you want to throw away {amount} of this item?", view=confirmation, ephemeral=True)
+        await confirmation.wait()
+
+        if not hasattr(self, "slot_entries") or not self.slot_entries:
+            await interaction.followup.send("This item is no longer available to throw away.", ephemeral=True)
+            self.stop()
+            return
+
+        if confirmation.confirmation:
+            selected_slot = self.slot_entries[self.cursor_position]
+            SQDeleteItem(self.author.id, selected_slot["slot"], amount)
+            await interaction.followup.send(f"Successfully threw away {amount} of the item.", ephemeral=True)
+        else:
+            await interaction.followup.send("Item throw canceled.", ephemeral=True)
+        
         self.stop()
         
     @discord.ui.button(label="Quick Sell", style=discord.ButtonStyle.success)
@@ -259,7 +330,12 @@ class SQInventoryMainUI(discord.ui.View):
         while not exit_loop:
             await asyncio.sleep(ASYNCIO_SLEEP_DELAY)
             
-            inspect_view = SQInventoryInspectEntries(self.author, exit_loop)
+            inspect_view = SQInventoryInspectEntries(
+                self.author,
+                exit_loop,
+                self.slot_entries,
+                self.cursor_position,
+            )
             await self.main_msg.edit(embed=embed, view=inspect_view)
             await inspect_view.wait()
             
@@ -275,16 +351,14 @@ class SQInventoryMainUI(discord.ui.View):
 
 @slimequest.command(name="inventory", description="View your inventory.")
 async def inventory(ctx: discord.ApplicationContext):
-    await ctx.defer()
-    
     if await SQUserExistsMessage(ctx):
         return
-    
+
     user_id = ctx.author.id
     exit_main_loop = False
     main_msg = await ctx.respond("Please wait.")
     cursor_position = 0
-    
+
     # 1. get the inventory items from the database
     inventory_items = SQGetInventoryItems(user_id)
 
@@ -292,19 +366,18 @@ async def inventory(ctx: discord.ApplicationContext):
     embed, sections, slot_entries = SQBuildInventoryState(ctx.author.name, inventory_items, cursor_position)
     if slot_entries:
         cursor_position %= len(slot_entries)
-    
+
     # initialize move entries
     move_entries = {
         "move_list": [None, None],  # [from_slot, to_slot]
         "move_counter": 0
     }
-    
+
     # main loop for the inventory UI
     while True:
-        
         if exit_main_loop:
             break
-        
+
         await asyncio.sleep(ASYNCIO_SLEEP_DELAY)
 
         inventory_items = SQGetInventoryItems(user_id)
@@ -312,15 +385,15 @@ async def inventory(ctx: discord.ApplicationContext):
         embed, sections, slot_entries = SQBuildInventoryState(ctx.author.name, inventory_items, cursor_position)
         if slot_entries:
             cursor_position %= len(slot_entries)
-        
+
         # create view with current cursor position
         inventory_view = SQInventoryMainUI(ctx.author, exit_main_loop, main_msg, slot_entries, cursor_position, move_entries)
-        
+
         await main_msg.edit(embed=embed, view=inventory_view)
         await inventory_view.wait()
 
         # pull updated cursor and exit flag from view
         cursor_position = inventory_view.cursor_position
         exit_main_loop = inventory_view.exit_main_loop
-        
-    await ctx.respond("Exited inventory.", ephemeral=True)
+
+    await main_msg.edit(content="Exited inventory.", embed=None, view=None)

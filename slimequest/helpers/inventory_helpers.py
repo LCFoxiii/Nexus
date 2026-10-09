@@ -1,4 +1,4 @@
-from items import *
+from .items import *
 from core.init_discord import *
 from ..init.database.creation import *
 

@@ -265,3 +265,60 @@ def SQSwap(
     sq_connection.commit()
     
     return True, "Items swapped successfully."
+
+def SQDeleteItem(user_id: int, slot: int, amount: int) -> bool:
+    """
+    Deletes a specified amount of an item from a given slot in the player's inventory.
+
+    Returns:
+        bool: True if the deletion was successful, False otherwise.
+    """
+    # Check if the slot is occupied
+    sq_cursor.execute(
+        f"""
+            SELECT quantity
+            FROM {TABLE_INVENTORY}
+            WHERE {ID_NAME} = ?
+              AND slot = ?
+        """,
+        (user_id, slot)
+    )
+
+    existing_stack = sq_cursor.fetchone()
+
+    if existing_stack is None:
+        # Slot is empty, cannot delete items
+        return False
+
+    current_quantity = existing_stack[0]
+
+    if amount <= 0 or amount > current_quantity:
+        # Invalid amount to delete
+        return False
+
+    new_quantity = current_quantity - amount
+
+    if new_quantity > 0:
+        # Update the quantity in the database
+        sq_cursor.execute(
+            f"""
+                UPDATE {TABLE_INVENTORY}
+                SET quantity = ?
+                WHERE {ID_NAME} = ?
+                  AND slot = ?
+            """,
+            (new_quantity, user_id, slot)
+        )
+    else:
+        # Remove the item from the inventory
+        sq_cursor.execute(
+            f"""
+                DELETE FROM {TABLE_INVENTORY}
+                WHERE {ID_NAME} = ?
+                  AND slot = ?
+            """,
+            (user_id, slot)
+        )
+
+    sq_connection.commit()
+    return True
