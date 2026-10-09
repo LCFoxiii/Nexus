@@ -68,12 +68,58 @@ class SQInventoryInspectEntries(discord.ui.View):
             return False
         return True
     
-    @discord.ui.button(label="Use", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="Use", style=discord.ButtonStyle.success)
     async def use(self, button: discord.ui.Button, interaction: discord.Interaction):
-        # TODO: Implement check if this item is usable.
-        # TODO: If item is equip / unequippable, change the button to "Equip" or "Unequip" depending on the state of the item.
+        cursor_index = self.cursor_position
+        item = self.slot_entries[cursor_index]
+        item_id = item["item_id"]
         
-        await interaction.response.send_message("TODO: Implement USE functionality.", ephemeral=True)
+        item_slot = item["slot"]
+        item_name = SQStatToString(items_dict[item_id]["name"])
+
+        # TODO: Implement Use actions.
+        # I rhink this should be self explanatory.
+        if button.label == "Equip":
+            item_type = items_dict[item_id]["item_type"]
+            armor_subtype = items_dict[item_id]["armor_subtype"]
+            
+            # this is guaranteed to be not None.
+            special_slot = SQGetSpecialSlotFromType(item_type, armor_subtype)
+            equip_item = self.slot_entries[special_slot]
+            
+            if SQInventorySlotHasNoItems(equip_item):
+                SQMoveItemToEmptySlot(self.author.id, item_slot, special_slot)
+                button.disabled = True
+                self.exit_loop = True
+            else:
+                SQSwap(self.author.id, item_id, equip_item["item_id"], item_slot, special_slot)
+
+            await interaction.message.edit(view=self)
+            await interaction.response.send_message(f"Equipped {item_name}.", ephemeral=True)
+        
+        elif button.label == "Unequip":
+            empty_slot = SQFindFirstEmptySlot(self.author.id)
+            
+            if empty_slot is None:
+                await interaction.response.send_message("No empty slot available to unequip the item. Throw out some items to make space.", ephemeral=True)
+                self.stop()
+                return
+            
+            # swap with the empty slot
+            SQMoveItemToEmptySlot(self.author.id, item_slot, empty_slot)
+            
+            button.disabled = True
+            self.exit_loop = True
+            await interaction.message.edit(view=self)
+            await interaction.response.send_message(f"Unequipped {item_name}.", ephemeral=True)
+        
+        elif button.label == "Use":
+            # TODO: this is easy to figure out, but not the time to do it.
+            # Since I don't have any consumable items yet, I will leave this for later.
+            
+            pass
+        
+        await interaction.response.edit_message(view=self)
         self.stop()
     
     @discord.ui.button(label="Throw", style=discord.ButtonStyle.danger)
@@ -158,6 +204,23 @@ class SQInventoryMainUI(discord.ui.View):
         self.slot_entries = slot_entries
         await self.main_msg.edit(embed=embed, view=self)
         return embed, sections, slot_entries
+
+    def configure_inspect_use_button(self, button: discord.ui.Button, item_id: int, cursor_index: int):
+        item_type = items_dict[item_id]["item_type"]
+        armor_subtype = items_dict[item_id]["armor_subtype"]
+
+        if item_type in [WEAPON_ITEM, SHIELD_ITEM, ARMOR_ITEM]:
+            if cursor_index in [HELMET, CHESTPLATE, LEGGINGS, BOOTS, WEAPON, SHIELD]:
+                button.label = "Unequip"
+                button.style = discord.ButtonStyle.danger
+            else:
+                button.label = "Equip"
+                button.style = discord.ButtonStyle.success
+        else:
+            button.label = "Use"
+            button.style = discord.ButtonStyle.success
+            
+        button.disabled = False
     
     @discord.ui.button(label="Goto", style=discord.ButtonStyle.success)
     async def goto_button(self, button: discord.ui.Button, interaction: discord.Interaction):
@@ -329,16 +392,26 @@ class SQInventoryMainUI(discord.ui.View):
 
         while not exit_loop:
             await asyncio.sleep(ASYNCIO_SLEEP_DELAY)
-            
+
             inspect_view = SQInventoryInspectEntries(
                 self.author,
                 exit_loop,
                 self.slot_entries,
                 self.cursor_position,
             )
+            
+            self.configure_inspect_use_button(
+                inspect_view.use,
+                selected_item_id,
+                selected_slot["slot"],
+            )
+            
+            if SQInventorySlotHasNoItems(selected_slot):
+                inspect_view.use.disabled = True
+            
             await self.main_msg.edit(embed=embed, view=inspect_view)
             await inspect_view.wait()
-            
+
             exit_loop = inspect_view.exit_loop
         
         self.stop()

@@ -137,3 +137,39 @@ def SQBuildInventoryState(author_name, inventory_items, cursor_position):
 
 def SQStatToString(stat_string):
     return str(stat_string).replace('_', ' ').title()
+
+def SQGetSpecialSlotFromType(item_type, armor_subtype):
+    if item_type == ARMOR_ITEM:
+        if armor_subtype == HELMET_ITEM:
+            return HELMET
+        elif armor_subtype == CHESTPLATE_ITEM:
+            return CHESTPLATE
+        elif armor_subtype == LEGGINGS_ITEM:
+            return LEGGINGS
+        elif armor_subtype == BOOTS_ITEM:
+            return BOOTS
+    elif item_type == WEAPON_ITEM:
+        return WEAPON
+    elif item_type == SHIELD_ITEM:
+        return SHIELD
+    else:
+        return None
+    
+def SQFindFirstEmptySlot(user_id) -> int | None:
+    sq_cursor.execute(
+        f"""
+            SELECT slot
+            FROM {TABLE_INVENTORY}
+            WHERE {ID_NAME} = ?
+            ORDER BY slot ASC
+        """,
+        (user_id,)
+    )
+    occupied_slots = {row[0] for row in sq_cursor.fetchall()}
+
+    for slot in range(INVENTORY_SLOT_START, INVENTORY_SLOT_END + 1):
+        if slot not in occupied_slots:
+            return slot
+
+    return None
+    

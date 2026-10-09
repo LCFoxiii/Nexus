@@ -11,9 +11,16 @@ DEV_GRANTED = "dev_granted"
 
 # types of items
 REGULAR_ITEM = "regular_item"
+CONSUMABLE_ITEM = "consumable_item"
 WEAPON_ITEM = "weapon_item"
 SHIELD_ITEM = "shield_item"
 ARMOR_ITEM = "armor_item"
+
+# armor subtypes
+HELMET_ITEM = "helmet_item"
+CHESTPLATE_ITEM = "chestplate_item"
+LEGGINGS_ITEM = "leggings_item"
+BOOTS_ITEM = "boots_item"
 
 # special slots
 HELMET     = -6
@@ -39,6 +46,7 @@ def CreateItemEntry(
     health_boost:            int,
     penetration_boost:       int,
     item_type:               str,
+    armor_subtype:           str,
     slime_splash_protection: int,
     block_penetration:       int,
 ):
@@ -61,7 +69,8 @@ def CreateItemEntry(
                 "slime_splash_protection": slime_splash_protection, # 0 - 100.
                 "block_penetration": block_penetration, # 0 - 100.
             },
-            "item_type": item_type
+            "item_type": item_type,
+            "armor_subtype": armor_subtype,
         }
     })
 
@@ -81,6 +90,7 @@ CreateItemEntry(
     penetration_boost=None,
     slime_splash_protection=None,
     item_type=REGULAR_ITEM,
+    armor_subtype=None,
     block_penetration=None
 )
 
@@ -100,6 +110,7 @@ CreateItemEntry(
     penetration_boost=5,
     slime_splash_protection=3,
     item_type=WEAPON_ITEM,
+    armor_subtype=None,
     block_penetration=5
 )
 
@@ -119,6 +130,7 @@ CreateItemEntry(
     penetration_boost=None,
     slime_splash_protection=5,
     item_type=SHIELD_ITEM,
+    armor_subtype=None,
     block_penetration=None
 )
 
@@ -138,6 +150,7 @@ CreateItemEntry(
     penetration_boost=None,
     slime_splash_protection=7,
     item_type=ARMOR_ITEM,
+    armor_subtype=HELMET_ITEM,
     block_penetration=None
 )
 
@@ -157,6 +170,7 @@ CreateItemEntry(
     penetration_boost=None,
     slime_splash_protection=10,
     item_type=ARMOR_ITEM,
+    armor_subtype=CHESTPLATE_ITEM,
     block_penetration=None
 )
 
@@ -176,6 +190,7 @@ CreateItemEntry(
     penetration_boost=None,
     slime_splash_protection=8,
     item_type=ARMOR_ITEM,
+    armor_subtype=LEGGINGS_ITEM,
     block_penetration=None
 )
 
@@ -195,5 +210,6 @@ CreateItemEntry(
     penetration_boost=None,
     slime_splash_protection=5,
     item_type=ARMOR_ITEM,
+    armor_subtype=BOOTS_ITEM,
     block_penetration=None
 )
