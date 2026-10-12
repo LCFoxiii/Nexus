@@ -174,7 +174,52 @@ class SQInventoryInspectEntries(discord.ui.View):
         
     @discord.ui.button(label="Quick Sell", style=discord.ButtonStyle.success)
     async def quick_sell(self, button: discord.ui.Button, interaction: discord.Interaction):
-        await interaction.response.send_message("TODO: Implement QUICK SELL functionality.", ephemeral=True)
+        selected_slot = self.slot_entries[self.cursor_position]
+        item_id = selected_slot["item_id"]
+        values = items_dict[item_id]["values"]
+        user_id = self.author.id
+        
+        # quantity
+        await interaction.response.send_message("Please type in how much of the item you want to sell:", ephemeral=True)
+        
+        try:
+            encoded = await bot.wait_for(
+                "message",
+                check=lambda message: message.author == self.author and message.channel == interaction.channel,
+                timeout=60,
+            )
+        except asyncio.TimeoutError:
+            await interaction.followup.send(
+                "Quick Sell timed out.",
+                ephemeral=True,
+            )
+            self.stop()
+            return
+        
+        # check if the input is a positive integer
+        match = re.fullmatch(r"([1-9]\d*)", encoded.content.strip())
+        if not match:
+            await interaction.followup.send(
+                "Invalid format. Please enter a positive integer.",
+                ephemeral=True,
+            )
+            self.stop()
+            return
+        
+        amount = int(match.group(1))
+        
+        #copper, silver, gold
+        coins = []
+        for value_type, value_amount in values.items():
+            if value_amount is not None:
+                coins.append(value_amount * amount)
+            else:
+                coins.append(0)
+        
+        SQSellItem(user_id, selected_slot["slot"], amount, coins)
+        
+        await interaction.followup.send(f"Successfully sold {amount} of the item for {coins[0]} copper, {coins[1]} silver, and {coins[2]} gold.", ephemeral=True)
+        
         self.stop()
         
     @discord.ui.button(label="Exit", style=discord.ButtonStyle.danger)
@@ -207,7 +252,6 @@ class SQInventoryMainUI(discord.ui.View):
 
     def configure_inspect_use_button(self, button: discord.ui.Button, item_id: int, cursor_index: int):
         item_type = items_dict[item_id]["item_type"]
-        armor_subtype = items_dict[item_id]["armor_subtype"]
 
         if item_type in [WEAPON_ITEM, SHIELD_ITEM, ARMOR_ITEM]:
             if cursor_index in [HELMET, CHESTPLATE, LEGGINGS, BOOTS, WEAPON, SHIELD]:
@@ -386,7 +430,7 @@ class SQInventoryMainUI(discord.ui.View):
                 stats_strings.append(f"{SQStatToString(stat_type)}: {stat_amount}")
         
         embed.add_field(name="Rarity", value=rarity, inline=True)
-        embed.add_field(name="Price", value="\n".join(value_strings), inline=True)
+        embed.add_field(name="Price", value="\n".join(value_strings) if value_strings else "Unsellable.", inline=True)
         embed.add_field(name="Stack Size", value=stack_string, inline=True)
         embed.add_field(name="Stats", value="\n".join(stats_strings) if stats_strings else "No useful stats available.", inline=True)
 
@@ -408,6 +452,16 @@ class SQInventoryMainUI(discord.ui.View):
             
             if SQInventorySlotHasNoItems(selected_slot):
                 inspect_view.use.disabled = True
+            
+            if not IsItemSellable(selected_item_id):
+                inspect_view.quick_sell.disabled = True
+                inspect_view.quick_sell.label = "Not Sellable"
+                inspect_view.quick_sell.style = discord.ButtonStyle.gray
+            
+            if not stats_strings:
+                inspect_view.use.disabled = True
+                inspect_view.use.label = "Unusable"
+                inspect_view.use.style = discord.ButtonStyle.gray
             
             await self.main_msg.edit(embed=embed, view=inspect_view)
             await inspect_view.wait()
@@ -470,3 +524,26 @@ async def inventory(ctx: discord.ApplicationContext):
         exit_main_loop = inventory_view.exit_main_loop
 
     await main_msg.edit(content="Exited inventory.", embed=None, view=None)
+    
+# temporary command to test the player's coin balance
+@slimequest.command(name="balance", description="TEMP: Check your coin balance.")
+async def balance(ctx: discord.ApplicationContext):
+    if await SQUserExistsMessage(ctx):
+        return
+
+    user_id = ctx.author.id
+    sq_cursor.execute(
+        f"""
+            SELECT copper_slime_coins, silver_slime_coins, gold_slime_coins
+            FROM {TABLE_CURRENCY}
+            WHERE {ID_NAME} = ?
+        """,
+        (user_id,)
+    )
+    result = sq_cursor.fetchone()
+
+    if result:
+        copper, silver, gold = result
+        await ctx.respond(f"Your balance:\nCopper: {copper}\nSilver: {silver}\nGold: {gold}")
+    else:
+        await ctx.respond("Error: User not found in the database.")

@@ -172,4 +172,89 @@ def SQFindFirstEmptySlot(user_id) -> int | None:
             return slot
 
     return None
-    
+
+def IsItemSellable(item_id):
+    item_entry = items_dict.get(item_id)
+    if not item_entry:
+        return False
+
+    values = item_entry.get("values", {})
+    return any(value is not None for value in values.values())
+
+
+def SQIncCurrency(user_id, copper=0, silver=0, gold=0):
+    sq_cursor.execute(
+        f"""
+            UPDATE {TABLE_CURRENCY}
+            SET copper_slime_coins = copper_slime_coins + ?,
+                silver_slime_coins = silver_slime_coins + ?,
+                gold_slime_coins = gold_slime_coins + ?
+            WHERE {ID_NAME} = ?
+        """,
+        (copper, silver, gold, user_id)
+    )
+    sq_connection.commit()
+
+def SQSellItem(user_id: int, slot: int, amount: int, coins: list) -> bool:
+    """
+    Sells a specified amount of an item from a given slot in the player's inventory.
+
+    Returns:
+        bool: True if the sale was successful, False otherwise.
+    """
+    # Check if the slot is occupied
+    sq_cursor.execute(
+        f"""
+            SELECT {ID_NAME_ITEM}, quantity
+            FROM {TABLE_INVENTORY}
+            WHERE {ID_NAME} = ?
+              AND slot = ?
+        """,
+        (user_id, slot)
+    )
+
+    existing_stack = sq_cursor.fetchone()
+
+    if existing_stack is None:
+        # Slot is empty, cannot sell items
+        return False
+
+    item_id, current_quantity = existing_stack
+
+    if amount <= 0 or amount > current_quantity:
+        # Invalid amount to sell
+        return False
+
+    # not needed.
+    ## Check if the item is sellable
+    # if not IsItemSellable(item_id):
+    #     return False
+
+    new_quantity = current_quantity - amount
+
+    if new_quantity > 0:
+        sq_cursor.execute(
+            f"""
+                UPDATE {TABLE_INVENTORY}
+                SET quantity = ?
+                WHERE {ID_NAME} = ?
+                  AND slot = ?
+            """,
+            (new_quantity, user_id, slot)
+        )
+    else:
+        sq_cursor.execute(
+            f"""
+                DELETE FROM {TABLE_INVENTORY}
+                WHERE {ID_NAME} = ?
+                  AND slot = ?
+            """,
+            (user_id, slot)
+        )
+
+    # Update the user's currency
+    copper, silver, gold = coins
+    SQIncCurrency(user_id, copper=copper, silver=silver, gold=gold)
+
+    sq_connection.commit()
+    return True
