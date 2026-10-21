@@ -14,3 +14,4 @@ from .helpers.inventory_helpers    import *
 from .commands.register      import *
 from .commands.attack        import *
 from .commands.inventory     import *
+from .commands.profile       import *

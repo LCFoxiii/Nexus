@@ -524,26 +524,3 @@ async def inventory(ctx: discord.ApplicationContext):
         exit_main_loop = inventory_view.exit_main_loop
 
     await main_msg.edit(content="Exited inventory.", embed=None, view=None)
-    
-# temporary command to test the player's coin balance
-@slimequest.command(name="balance", description="TEMP: Check your coin balance.")
-async def balance(ctx: discord.ApplicationContext):
-    if await SQUserExistsMessage(ctx):
-        return
-
-    user_id = ctx.author.id
-    sq_cursor.execute(
-        f"""
-            SELECT copper_slime_coins, silver_slime_coins, gold_slime_coins
-            FROM {TABLE_CURRENCY}
-            WHERE {ID_NAME} = ?
-        """,
-        (user_id,)
-    )
-    result = sq_cursor.fetchone()
-
-    if result:
-        copper, silver, gold = result
-        await ctx.respond(f"Your balance:\nCopper: {copper}\nSilver: {silver}\nGold: {gold}")
-    else:
-        await ctx.respond("Error: User not found in the database.")

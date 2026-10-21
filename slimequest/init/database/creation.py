@@ -33,32 +33,45 @@ sq_cursor.execute(
 )
 
 # currency
+COPPER = "copper_slime_coins"
+SILVER = "silver_slime_coins"
+GOLD = "gold_slime_coins"
 sq_cursor.execute(
     f"""
         CREATE TABLE IF NOT EXISTS {TABLE_CURRENCY} (
             {ID_NAME} INTEGER PRIMARY KEY,
-            copper_slime_coins INTEGER NOT NULL DEFAULT 0,
-            silver_slime_coins INTEGER NOT NULL DEFAULT 0,
-            gold_slime_coins INTEGER NOT NULL DEFAULT 0
+            {COPPER} INTEGER NOT NULL DEFAULT 0,
+            {SILVER} INTEGER NOT NULL DEFAULT 0,
+            {GOLD} INTEGER NOT NULL DEFAULT 0
         )
     """
 )
 
 # stats
+LEVEL = "level"
+XP = "xp"
+HEALTH = "health"
+MANA = "mana"
+DEXTERITY = "dexterity"
+STRENGTH = "strength"
+DEFENSE = "defense"
+SPEED = "speed"
+DAMAGE = "damage"
+CRITICAL_CHANCE = "critical_chance"
 sq_cursor.execute(
     f"""
         CREATE TABLE IF NOT EXISTS {TABLE_STATS} (
             {ID_NAME} INTEGER PRIMARY KEY,
-            level INTEGER NOT NULL DEFAULT 0,
-            xp INTEGER NOT NULL DEFAULT 0,
-            health INTEGER NOT NULL DEFAULT 100,
-            mana INTEGER NOT NULL DEFAULT 100,
-            dexterity INTEGER NOT NULL DEFAULT 0 CHECK (dexterity >= 0 AND dexterity <= 100),
-            strength INTEGER NOT NULL DEFAULT 0 CHECK (strength >= 0),
-            defense INTEGER NOT NULL DEFAULT 0 CHECK (defense >= 0),
-            speed INTEGER NOT NULL DEFAULT 10 CHECK (speed >= 0 AND speed <= 100),
-            damage INTEGER NOT NULL DEFAULT 30 CHECK (damage >= 0),
-            critical_chance INTEGER NOT NULL DEFAULT 0 CHECK (critical_chance >= 0 AND critical_chance <= 200)
+            {LEVEL} INTEGER NOT NULL DEFAULT 0,
+            {XP} INTEGER NOT NULL DEFAULT 0,
+            {HEALTH} INTEGER NOT NULL DEFAULT 100,
+            {MANA} INTEGER NOT NULL DEFAULT 100,
+            {DEXTERITY} INTEGER NOT NULL DEFAULT 0 CHECK (dexterity >= 0 AND dexterity <= 100),
+            {STRENGTH} INTEGER NOT NULL DEFAULT 0 CHECK (strength >= 0),
+            {DEFENSE} INTEGER NOT NULL DEFAULT 0 CHECK (defense >= 0),
+            {SPEED} INTEGER NOT NULL DEFAULT 10 CHECK (speed >= 0 AND speed <= 100),
+            {DAMAGE} INTEGER NOT NULL DEFAULT 30 CHECK (damage >= 0),
+            {CRITICAL_CHANCE} INTEGER NOT NULL DEFAULT 0 CHECK (critical_chance >= 0 AND critical_chance <= 200)
         )
     """
 )
