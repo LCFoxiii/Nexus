@@ -115,8 +115,8 @@ async def remember(ctx: discord.ApplicationContext):
         f"UPDATE {TABLE_NAME} SET remember_login = TRUE WHERE user_id = ?",
         (user_id,)
     )
-
     
+    connection.commit()
 
     print(f"LOG: user {ctx.author.name} (ID: {user_id}) will now be remembered to log in automatically upon bot startup.")
     await ctx.respond("You will now be remembered to log in automatically upon bot startup.", ephemeral=True)
@@ -133,9 +133,9 @@ async def forget(ctx: discord.ApplicationContext):
         f"UPDATE {TABLE_NAME} SET remember_login = FALSE WHERE user_id = ?",
         (user_id,)
     )
-
     
-
+    connection.commit()
+    
     print(f"LOG: user {ctx.author.name} (ID: {user_id}) will no longer be remembered to log in automatically upon bot startup.")
     await ctx.respond("You will no longer be remembered- wait, who are you?", ephemeral=True)
 
