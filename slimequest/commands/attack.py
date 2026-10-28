@@ -15,6 +15,9 @@ from ..init.database.creation import *
 import random
 import asyncio
 
+from .inventory import *
+
+
 # ---------------------------------------------------------- #
 # a little bit of a sneak peek, but                          #
 # in the future, everything will be combined into one.       #
@@ -300,7 +303,22 @@ class SQAttackUI(discord.ui.View):
             self.battle_state["player_turn_count"] -= 1
 
         self.stop()
-
+        
+    @discord.ui.button(label="Inventory", row=1, style=discord.ButtonStyle.gray)
+    async def inventory_button(self, button: discord.ui.Button, interaction: discord.Interaction):
+        
+        ctx = await bot.get_application_context(interaction)
+        
+        await inventory(ctx=ctx)
+        
+        await interaction.followup.send(
+            "You opened your inventory. -1 turn.",
+            ephemeral=True,
+            delete_after=MESSAGE_DELETE_DELAY
+        )
+        
+        self.battle_state["player_turn_count"] -= 1
+        self.stop()
 
 @slimequest.command(name="attack", description="TEMP: Creates a slime and put you in a simulated battle with it.")
 async def attack(ctx: discord.ApplicationContext):

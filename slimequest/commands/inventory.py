@@ -523,4 +523,4 @@ async def inventory(ctx: discord.ApplicationContext):
         cursor_position = inventory_view.cursor_position
         exit_main_loop = inventory_view.exit_main_loop
 
-    await main_msg.edit(content="Exited inventory.", embed=None, view=None)
+    await main_msg.edit(content="Exited inventory.", embed=None, view=None, delete_after=MESSAGE_DELETE_DELAY)
